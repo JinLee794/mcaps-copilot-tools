@@ -1,0 +1,640 @@
+// MCP tool definitions — maps CRM operations to MCP tools
+// Each tool receives validated params and calls createCrmClient methods
+
+import { z } from 'zod';
+import { isValidGuid, normalizeGuid, isValidTpid, sanitizeODataString } from './validation.js';
+
+const MILESTONE_SELECT = [
+  'msp_engagementmilestoneid',
+  'msp_milestonenumber',
+  'msp_name',
+  '_msp_workloadlkid_value',
+  'msp_commitmentrecommendation',
+  'msp_milestonecategory',
+  'msp_monthlyuse',
+  'msp_milestonedate',
+  'msp_milestonestatus',
+  '_ownerid_value',
+  '_msp_opportunityid_value',
+  'msp_forecastcommentsjsonfield',
+  'msp_forecastcomments'
+].join(',');
+
+const OPP_SELECT = [
+  'opportunityid', 'name', 'estimatedclosedate',
+  'msp_estcompletiondate', 'msp_consumptionconsumedrecurring',
+  '_ownerid_value', '_parentaccountid_value', 'msp_salesplay'
+].join(',');
+
+const TASK_CATEGORIES = [
+  { label: 'Technical Close/Win Plan', value: 606820005 },
+  { label: 'Architecture Design Session', value: 861980004 },
+  { label: 'Blocker Escalation', value: 861980006 },
+  { label: 'Briefing', value: 861980008 },
+  { label: 'Consumption Plan', value: 861980007 },
+  { label: 'Demo', value: 861980002 },
+  { label: 'PoC/Pilot', value: 861980005 },
+  { label: 'Workshop', value: 861980001 }
+];
+
+const text = (content) => ({ content: [{ type: 'text', text: typeof content === 'string' ? content : JSON.stringify(content, null, 2) }] });
+const error = (msg) => ({ content: [{ type: 'text', text: msg }], isError: true });
+
+function monthKey(dateValue) {
+  if (!dateValue) return null;
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 7);
+}
+
+function toIsoDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Register all CRM tools on an McpServer instance.
+ */
+export function registerTools(server, crmClient) {
+  // ── crm_whoami ──────────────────────────────────────────────
+  server.tool(
+    'crm_whoami',
+    'Validate CRM access and return the current user identity (UserId, name).',
+    {},
+    async () => {
+      const result = await crmClient.request('WhoAmI');
+      if (!result.ok) return error(`WhoAmI failed: ${result.data?.message || result.status}`);
+      return text(result.data);
+    }
+  );
+
+  // ── crm_query ───────────────────────────────────────────────
+  server.tool(
+    'crm_query',
+    'Execute a read-only OData GET against any Dynamics 365 entity set. Supports $filter, $select, $orderby, $top, $expand. Auto-paginates results.',
+    {
+      entitySet: z.string().describe('Entity set name, e.g. "opportunities", "accounts", "msp_engagementmilestones"'),
+      filter: z.string().optional().describe('OData $filter expression'),
+      select: z.string().optional().describe('Comma-separated field names for $select'),
+      orderby: z.string().optional().describe('OData $orderby expression'),
+      top: z.number().optional().describe('Maximum number of records to return'),
+      expand: z.string().optional().describe('OData $expand expression')
+    },
+    async ({ entitySet, filter, select, orderby, top, expand }) => {
+      if (!entitySet) return error('entitySet is required');
+      const query = {};
+      if (filter) query.$filter = filter;
+      if (select) query.$select = select;
+      if (orderby) query.$orderby = orderby;
+      if (top) query.$top = String(top);
+      if (expand) query.$expand = expand;
+
+      const result = await crmClient.requestAllPages(entitySet, { query });
+      if (!result.ok) return error(`Query failed (${result.status}): ${result.data?.message}`);
+
+      const records = result.data?.value || (result.data ? [result.data] : []);
+      return text({ count: records.length, value: records });
+    }
+  );
+
+  // ── crm_get_record ──────────────────────────────────────────
+  server.tool(
+    'crm_get_record',
+    'Retrieve a single Dynamics 365 record by entity set and GUID.',
+    {
+      entitySet: z.string().describe('Entity set name, e.g. "opportunities", "accounts"'),
+      id: z.string().describe('Record GUID'),
+      select: z.string().optional().describe('Comma-separated field names for $select')
+    },
+    async ({ entitySet, id, select }) => {
+      if (!entitySet) return error('entitySet is required');
+      const normalized = normalizeGuid(id);
+      if (!isValidGuid(normalized)) return error('Invalid GUID');
+      const query = {};
+      if (select) query.$select = select;
+      const result = await crmClient.request(`${entitySet}(${normalized})`, { query });
+      if (!result.ok) return error(`Get record failed (${result.status}): ${result.data?.message}`);
+      return text(result.data);
+    }
+  );
+
+  // ── list_opportunities ──────────────────────────────────────
+  server.tool(
+    'list_opportunities',
+    'List open opportunities for one or more account IDs. Returns opportunity name, dates, owner, solution play.',
+    {
+      accountIds: z.array(z.string()).describe('Array of Dynamics 365 account GUIDs')
+    },
+    async ({ accountIds }) => {
+      if (!accountIds?.length) return error('At least one accountId is required');
+      const validIds = accountIds.map(normalizeGuid).filter(isValidGuid);
+      if (!validIds.length) return error('No valid account GUIDs provided');
+
+      // Chunk into groups of 25 to keep filter URL manageable
+      const chunks = [];
+      for (let i = 0; i < validIds.length; i += 25) chunks.push(validIds.slice(i, i + 25));
+
+      const allOpps = [];
+      for (const chunk of chunks) {
+        const filter = `(${chunk.map(id => `_parentaccountid_value eq '${id}'`).join(' or ')}) and statecode eq 0`;
+        const result = await crmClient.requestAllPages('opportunities', {
+          query: { $filter: filter, $select: OPP_SELECT, $orderby: 'name' }
+        });
+        if (result.ok && result.data?.value) allOpps.push(...result.data.value);
+      }
+
+      return text({ count: allOpps.length, opportunities: allOpps });
+    }
+  );
+
+  // ── get_milestones ──────────────────────────────────────────
+  server.tool(
+    'get_milestones',
+    'Get engagement milestones by milestoneId, milestone number, opportunity, or owner. Defaults to current user milestones when no filters are provided.',
+    {
+      opportunityId: z.string().optional().describe('Opportunity GUID to list milestones for'),
+      milestoneNumber: z.string().optional().describe('Milestone number to search for, e.g. "7-123456789"'),
+      milestoneId: z.string().optional().describe('Direct milestone GUID lookup'),
+      ownerId: z.string().optional().describe('Owner system user GUID to list milestones for'),
+      mine: z.boolean().optional().describe('When true (default), returns milestones owned by the authenticated CRM user if no other filter is provided')
+    },
+    async ({ opportunityId, milestoneNumber, milestoneId, ownerId, mine }) => {
+      // Direct GUID lookup
+      if (milestoneId) {
+        const nid = normalizeGuid(milestoneId);
+        if (!isValidGuid(nid)) return error('Invalid milestoneId GUID');
+        const result = await crmClient.request(`msp_engagementmilestones(${nid})`, {
+          query: { $select: MILESTONE_SELECT }
+        });
+        if (!result.ok) return error(`Milestone lookup failed (${result.status}): ${result.data?.message}`);
+        return text(result.data);
+      }
+
+      let filter;
+      if (milestoneNumber) {
+        const sanitized = sanitizeODataString(milestoneNumber.trim());
+        filter = `msp_milestonenumber eq '${sanitized}'`;
+      } else if (opportunityId) {
+        const nid = normalizeGuid(opportunityId);
+        if (!isValidGuid(nid)) return error('Invalid opportunityId GUID');
+        filter = `_msp_opportunityid_value eq '${nid}'`;
+      } else if (ownerId) {
+        const nid = normalizeGuid(ownerId);
+        if (!isValidGuid(nid)) return error('Invalid ownerId GUID');
+        filter = `_ownerid_value eq '${nid}'`;
+      } else if (mine !== false) {
+        const whoAmI = await crmClient.request('WhoAmI');
+        if (!whoAmI.ok || !whoAmI.data?.UserId) {
+          return error(`Unable to resolve current CRM user for milestone lookup (${whoAmI.status}): ${whoAmI.data?.message || 'WhoAmI failed'}`);
+        }
+        const nid = normalizeGuid(whoAmI.data.UserId);
+        filter = `_ownerid_value eq '${nid}'`;
+      } else {
+        return error('Provide opportunityId, milestoneNumber, milestoneId, ownerId, or set mine=true');
+      }
+
+      const result = await crmClient.requestAllPages('msp_engagementmilestones', {
+        query: { $filter: filter, $select: MILESTONE_SELECT, $orderby: 'msp_milestonedate' }
+      });
+      if (!result.ok) return error(`Get milestones failed (${result.status}): ${result.data?.message}`);
+      const milestones = result.data?.value || [];
+      return text({ count: milestones.length, milestones });
+    }
+  );
+
+  // ── create_task ─────────────────────────────────────────────
+  server.tool(
+    'create_task',
+    'Create a task linked to an engagement milestone. Optionally specify category, subject, due date, and owner.',
+    {
+      milestoneId: z.string().describe('Engagement milestone GUID to link the task to'),
+      subject: z.string().describe('Task subject/title'),
+      category: z.number().optional().describe(`Task category code. Valid values: ${TASK_CATEGORIES.map(c => `${c.value} (${c.label})`).join(', ')}`),
+      dueDate: z.string().optional().describe('Due date in YYYY-MM-DD format'),
+      ownerId: z.string().optional().describe('System user GUID to assign as owner'),
+      description: z.string().optional().describe('Task description')
+    },
+    async ({ milestoneId, subject, category, dueDate, ownerId, description }) => {
+      const nid = normalizeGuid(milestoneId);
+      if (!isValidGuid(nid)) return error('Invalid milestoneId GUID');
+      if (!subject) return error('subject is required');
+
+      const payload = {
+        subject,
+        'regardingobjectid_msp_engagementmilestone@odata.bind': `/msp_engagementmilestones(${nid})`
+      };
+      if (category !== undefined) payload.msp_taskcategory = category;
+      if (dueDate) payload.scheduledend = dueDate;
+      if (description) payload.description = description;
+      if (ownerId) {
+        const ownerNid = normalizeGuid(ownerId);
+        if (!isValidGuid(ownerNid)) return error('Invalid ownerId GUID');
+        payload['ownerid@odata.bind'] = `/systemusers(${ownerNid})`;
+      }
+
+      // TODO: Re-enable write operation after testing
+      // const result = await crmClient.request('tasks', { method: 'POST', body: payload });
+      // if (!result.ok) return error(`Create task failed (${result.status}): ${result.data?.message}`);
+      // return text({ success: true, data: result.data });
+      return text({ mock: true, message: '[DRY RUN] create_task — write disabled during testing', payload });
+    }
+  );
+
+  // ── update_task ─────────────────────────────────────────────
+  server.tool(
+    'update_task',
+    'Update fields on an existing task (subject, due date, description, status).',
+    {
+      taskId: z.string().describe('Task GUID'),
+      subject: z.string().optional().describe('New subject'),
+      dueDate: z.string().optional().describe('New due date YYYY-MM-DD'),
+      description: z.string().optional().describe('New description'),
+      statusCode: z.number().optional().describe('New status code')
+    },
+    async ({ taskId, subject, dueDate, description, statusCode }) => {
+      const nid = normalizeGuid(taskId);
+      if (!isValidGuid(nid)) return error('Invalid taskId GUID');
+      const payload = {};
+      if (subject !== undefined) payload.subject = subject;
+      if (dueDate !== undefined) payload.scheduledend = dueDate;
+      if (description !== undefined) payload.description = description;
+      if (statusCode !== undefined) payload.statuscode = statusCode;
+      if (Object.keys(payload).length === 0) return error('No fields to update');
+
+      // TODO: Re-enable write operation after testing
+      // const result = await crmClient.request(`tasks(${nid})`, { method: 'PATCH', body: payload });
+      // if (!result.ok) return error(`Update task failed (${result.status}): ${result.data?.message}`);
+      // return text({ success: true });
+      return text({ mock: true, message: '[DRY RUN] update_task — write disabled during testing', taskId: nid, payload });
+    }
+  );
+
+  // ── close_task ──────────────────────────────────────────────
+  server.tool(
+    'close_task',
+    'Close a task using the CloseTask action (with fallback to bound Close endpoint).',
+    {
+      taskId: z.string().describe('Task GUID'),
+      statusCode: z.number().describe('Status code for the closure (e.g. 5 = Completed, 6 = Cancelled)'),
+      subject: z.string().optional().describe('Close subject (defaults to "Task Closed")')
+    },
+    async ({ taskId, statusCode, subject }) => {
+      const nid = normalizeGuid(taskId);
+      if (!isValidGuid(nid)) return error('Invalid taskId GUID');
+      if (statusCode === undefined) return error('statusCode is required');
+
+      // Try CloseTask action first, then fallback to bound Close endpoint
+      const attempts = [
+        {
+          path: 'CloseTask',
+          opts: {
+            method: 'POST',
+            body: {
+              TaskClose: {
+                subject: subject || 'Task Closed',
+                'activityid@odata.bind': `/tasks(${nid})`
+              },
+              Status: statusCode
+            }
+          }
+        },
+        {
+          path: `tasks(${nid})/Microsoft.Dynamics.CRM.Close`,
+          opts: {
+            method: 'POST',
+            body: { Status: statusCode }
+          }
+        }
+      ];
+
+      // TODO: Re-enable write operation after testing
+      // for (const attempt of attempts) {
+      //   const result = await crmClient.request(attempt.path, attempt.opts);
+      //   if (result.ok || result.status === 204) return text({ success: true });
+      // }
+      // return error('Close task failed with both CloseTask action and bound Close endpoint');
+      return text({ mock: true, message: '[DRY RUN] close_task — write disabled during testing', taskId: nid, statusCode, attempts });
+    }
+  );
+
+  // ── update_milestone ────────────────────────────────────────
+  server.tool(
+    'update_milestone',
+    'Update fields on an engagement milestone (date, monthly use, comments).',
+    {
+      milestoneId: z.string().describe('Engagement milestone GUID'),
+      milestoneDate: z.string().optional().describe('New milestone date YYYY-MM-DD'),
+      monthlyUse: z.number().optional().describe('New monthly use value'),
+      forecastComments: z.string().optional().describe('Forecast comments text')
+    },
+    async ({ milestoneId, milestoneDate, monthlyUse, forecastComments }) => {
+      const nid = normalizeGuid(milestoneId);
+      if (!isValidGuid(nid)) return error('Invalid milestoneId GUID');
+      const payload = {};
+      if (milestoneDate !== undefined) payload.msp_milestonedate = milestoneDate;
+      if (monthlyUse !== undefined) payload.msp_monthlyuse = monthlyUse;
+      if (forecastComments !== undefined) payload.msp_forecastcomments = forecastComments;
+      if (Object.keys(payload).length === 0) return error('No fields to update');
+
+      // TODO: Re-enable write operation after testing
+      // const result = await crmClient.request(`msp_engagementmilestones(${nid})`, { method: 'PATCH', body: payload });
+      // if (!result.ok) return error(`Update milestone failed (${result.status}): ${result.data?.message}`);
+      // return text({ success: true });
+      return text({ mock: true, message: '[DRY RUN] update_milestone — write disabled during testing', milestoneId: nid, payload });
+    }
+  );
+
+  // ── list_accounts_by_tpid ───────────────────────────────────
+  server.tool(
+    'list_accounts_by_tpid',
+    'Find accounts by MS Top Parent ID (TPID). Returns account GUIDs and names.',
+    {
+      tpids: z.array(z.string()).describe('Array of TPID values (numeric strings)')
+    },
+    async ({ tpids }) => {
+      if (!tpids?.length) return error('At least one TPID is required');
+      const valid = tpids.filter(isValidTpid);
+      if (!valid.length) return error('No valid TPIDs provided');
+
+      const filter = valid.map(t => `msp_mstopparentid eq '${sanitizeODataString(t)}'`).join(' or ');
+      const result = await crmClient.requestAllPages('accounts', {
+        query: {
+          $filter: filter,
+          $select: 'accountid,name,msp_mstopparentid',
+          $orderby: 'name'
+        }
+      });
+      if (!result.ok) return error(`Account lookup failed (${result.status}): ${result.data?.message}`);
+      const accounts = result.data?.value || [];
+      return text({ count: accounts.length, accounts });
+    }
+  );
+
+  // ── get_task_status_options ─────────────────────────────────
+  server.tool(
+    'get_task_status_options',
+    'Retrieve available task status/statuscode options from Dynamics 365 metadata.',
+    {},
+    async () => {
+      const result = await crmClient.request(
+        "EntityDefinitions(LogicalName='task')/Attributes(LogicalName='statuscode')/Microsoft.Dynamics.CRM.StatusAttributeMetadata",
+        { query: { $select: 'LogicalName', $expand: 'OptionSet($select=Options)' } }
+      );
+      if (!result.ok) return error(`Metadata query failed (${result.status}): ${result.data?.message}`);
+
+      const options = result.data?.OptionSet?.Options || [];
+      const parsed = options
+        .map(o => ({
+          value: o?.Value,
+          label: o?.Label?.UserLocalizedLabel?.Label || o?.Label?.LocalizedLabels?.[0]?.Label || '',
+          stateCode: o?.State
+        }))
+        .filter(o => Number.isInteger(o.value) && o.label);
+      return text(parsed);
+    }
+  );
+
+  // ── get_milestone_activities ────────────────────────────────
+  server.tool(
+    'get_milestone_activities',
+    'List tasks/activities linked to an engagement milestone.',
+    {
+      milestoneId: z.string().describe('Engagement milestone GUID')
+    },
+    async ({ milestoneId }) => {
+      const nid = normalizeGuid(milestoneId);
+      if (!isValidGuid(nid)) return error('Invalid milestoneId GUID');
+
+      const filter = `_regardingobjectid_value eq '${nid}'`;
+      const result = await crmClient.requestAllPages('tasks', {
+        query: {
+          $filter: filter,
+          $select: 'activityid,subject,scheduledend,statuscode,statecode,_ownerid_value,description,msp_taskcategory',
+          $orderby: 'createdon desc'
+        }
+      });
+      if (!result.ok) return error(`Get activities failed (${result.status}): ${result.data?.message}`);
+      const tasks = result.data?.value || [];
+      return text({ count: tasks.length, tasks });
+    }
+  );
+
+  // ── view_milestone_timeline ─────────────────────────────────
+  server.tool(
+    'view_milestone_timeline',
+    'Return timeline-friendly milestone events for a user or opportunity, with render hints for Copilot UI.',
+    {
+      ownerId: z.string().optional().describe('System user GUID to filter milestone owner'),
+      opportunityId: z.string().optional().describe('Opportunity GUID to filter milestones'),
+      fromDate: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+      toDate: z.string().optional().describe('End date (YYYY-MM-DD)')
+    },
+    async ({ ownerId, opportunityId, fromDate, toDate }) => {
+      if (!ownerId && !opportunityId) {
+        return error('Provide ownerId or opportunityId');
+      }
+
+      const filters = [];
+      if (ownerId) {
+        const ownerNid = normalizeGuid(ownerId);
+        if (!isValidGuid(ownerNid)) return error('Invalid ownerId GUID');
+        filters.push(`_ownerid_value eq '${ownerNid}'`);
+      }
+
+      if (opportunityId) {
+        const oppNid = normalizeGuid(opportunityId);
+        if (!isValidGuid(oppNid)) return error('Invalid opportunityId GUID');
+        filters.push(`_msp_opportunityid_value eq '${oppNid}'`);
+      }
+
+      if (fromDate) filters.push(`msp_milestonedate ge ${sanitizeODataString(fromDate)}`);
+      if (toDate) filters.push(`msp_milestonedate le ${sanitizeODataString(toDate)}`);
+
+      const result = await crmClient.requestAllPages('msp_engagementmilestones', {
+        query: {
+          $filter: filters.join(' and '),
+          $select: 'msp_engagementmilestoneid,msp_milestonenumber,msp_name,msp_milestonestatus,msp_milestonedate,msp_monthlyuse,_msp_opportunityid_value',
+          $orderby: 'msp_milestonedate asc'
+        }
+      });
+      if (!result.ok) return error(`Timeline query failed (${result.status}): ${result.data?.message}`);
+
+      const milestones = result.data?.value || [];
+      const oppIds = [...new Set(milestones.map(m => m._msp_opportunityid_value).filter(Boolean))];
+      const opportunityNames = {};
+
+      for (const id of oppIds) {
+        const opp = await crmClient.request(`opportunities(${id})`, { query: { $select: 'name' } });
+        if (opp.ok && opp.data?.name) opportunityNames[id] = opp.data.name;
+      }
+
+      const events = milestones.map(m => ({
+        id: m.msp_engagementmilestoneid,
+        date: toIsoDate(m.msp_milestonedate),
+        title: m.msp_name,
+        milestoneNumber: m.msp_milestonenumber,
+        status: m['msp_milestonestatus@OData.Community.Display.V1.FormattedValue'] ?? m.msp_milestonestatus,
+        monthlyUse: m.msp_monthlyuse ?? null,
+        opportunityId: m._msp_opportunityid_value ?? null,
+        opportunityName: opportunityNames[m._msp_opportunityid_value] ?? null
+      }));
+
+      return text({
+        count: events.length,
+        events,
+        renderHints: {
+          view: 'timeline',
+          defaultSort: { field: 'date', direction: 'asc' },
+          dateField: 'date',
+          titleField: 'title',
+          laneField: 'opportunityName',
+          statusField: 'status'
+        }
+      });
+    }
+  );
+
+  // ── view_opportunity_cost_trend ────────────────────────────
+  server.tool(
+    'view_opportunity_cost_trend',
+    'Return monthly cost/consumption trend points for an opportunity with chart/table render hints.',
+    {
+      opportunityId: z.string().describe('Opportunity GUID'),
+      includeMilestones: z.boolean().optional().describe('Include milestone monthly-use points (default true)')
+    },
+    async ({ opportunityId, includeMilestones = true }) => {
+      const oppNid = normalizeGuid(opportunityId);
+      if (!isValidGuid(oppNid)) return error('Invalid opportunityId GUID');
+
+      const opportunityResult = await crmClient.request(`opportunities(${oppNid})`, {
+        query: {
+          $select: 'opportunityid,name,estimatedclosedate,msp_estcompletiondate,msp_consumptionconsumedrecurring'
+        }
+      });
+      if (!opportunityResult.ok) {
+        return error(`Opportunity lookup failed (${opportunityResult.status}): ${opportunityResult.data?.message}`);
+      }
+
+      const opportunity = opportunityResult.data || {};
+      const byMonth = new Map();
+
+      if (includeMilestones) {
+        const milestoneResult = await crmClient.requestAllPages('msp_engagementmilestones', {
+          query: {
+            $filter: `_msp_opportunityid_value eq '${oppNid}'`,
+            $select: 'msp_milestonedate,msp_monthlyuse,msp_name,msp_milestonenumber',
+            $orderby: 'msp_milestonedate asc'
+          }
+        });
+        if (!milestoneResult.ok) {
+          return error(`Milestone trend query failed (${milestoneResult.status}): ${milestoneResult.data?.message}`);
+        }
+
+        for (const milestone of milestoneResult.data?.value || []) {
+          const key = monthKey(milestone.msp_milestonedate);
+          const amount = Number(milestone.msp_monthlyuse ?? 0);
+          if (!key || Number.isNaN(amount)) continue;
+          byMonth.set(key, (byMonth.get(key) || 0) + amount);
+        }
+      }
+
+      const points = [...byMonth.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([month, planned]) => ({ month, plannedMonthlyUse: planned }));
+
+      const totalPlanned = points.reduce((sum, point) => sum + point.plannedMonthlyUse, 0);
+      const consumedRecurring = Number(opportunity.msp_consumptionconsumedrecurring ?? 0);
+
+      return text({
+        opportunity: {
+          id: opportunity.opportunityid,
+          name: opportunity.name,
+          estimatedCloseDate: toIsoDate(opportunity.estimatedclosedate),
+          estimatedCompletionDate: toIsoDate(opportunity.msp_estcompletiondate),
+          consumedRecurring
+        },
+        points,
+        kpis: {
+          consumedRecurring,
+          totalPlannedMonthlyUse: totalPlanned,
+          latestPlannedMonthlyUse: points.length ? points[points.length - 1].plannedMonthlyUse : 0
+        },
+        renderHints: {
+          view: 'timeseries',
+          xField: 'month',
+          yFields: ['plannedMonthlyUse'],
+          currency: 'USD',
+          defaultChart: 'line',
+          showTable: true
+        }
+      });
+    }
+  );
+
+  // ── view_staged_changes_diff ───────────────────────────────
+  server.tool(
+    'view_staged_changes_diff',
+    'Build a render-friendly before/after diff table from staged write payloads.',
+    {
+      before: z.object({}).passthrough().describe('Current values object (before)'),
+      after: z.object({}).passthrough().describe('Proposed values object (after)'),
+      context: z.string().optional().describe('Optional context label (e.g. operation ID)')
+    },
+    async ({ before, after, context }) => {
+      const keys = [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])];
+      const rows = keys
+        .map((field) => {
+          const beforeValue = before?.[field] ?? null;
+          const afterValue = after?.[field] ?? null;
+          const beforeText = beforeValue === null ? null : String(beforeValue);
+          const afterText = afterValue === null ? null : String(afterValue);
+
+          if (beforeText === afterText) return null;
+
+          let changeType = 'updated';
+          if (beforeValue === null && afterValue !== null) changeType = 'added';
+          if (beforeValue !== null && afterValue === null) changeType = 'removed';
+
+          return {
+            field,
+            before: beforeValue,
+            after: afterValue,
+            changeType
+          };
+        })
+        .filter(Boolean);
+
+      return text({
+        context: context || null,
+        summary: {
+          changedFieldCount: rows.length
+        },
+        rows,
+        renderHints: {
+          view: 'diffTable',
+          columns: ['field', 'before', 'after', 'changeType'],
+          emphasisField: 'changeType'
+        }
+      });
+    }
+  );
+
+  // ── crm_auth_status ─────────────────────────────────────────
+  server.tool(
+    'crm_auth_status',
+    'Check authentication status — shows current user, expiry, CRM URL.',
+    {},
+    async () => {
+      const authResult = await crmClient.request('WhoAmI');
+      if (!authResult.ok) return error(`Not authenticated: ${authResult.data?.message || authResult.status}`);
+      return text({
+        authenticated: true,
+        userId: authResult.data?.UserId,
+        businessUnitId: authResult.data?.BusinessUnitId,
+        organizationId: authResult.data?.OrganizationId
+      });
+    }
+  );
+}
