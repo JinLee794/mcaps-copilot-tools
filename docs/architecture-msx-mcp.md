@@ -1,13 +1,15 @@
-# MSX Helper MCP — Architecture (CRM + WorkIQ MCP usage)
+# MCAPS Copilot Tools — Architecture (CRM + WorkIQ MCP usage)
 
 This document describes how MCP-based workflows should split retrieval between MSX (Dynamics 365 CRM) and WorkIQ (Microsoft 365 data such as Teams, meetings, Outlook, and SharePoint/OneDrive).
+
+Copilot CLI is an ideal integration point for these workflows, where role skills, `msx-crm` tools, and WorkIQ retrieval (`ask_work_iq`) can be composed in one operational loop.
 
 ## System Overview
 
 ```mermaid
 flowchart LR
   U[User / Copilot Chat] --> C["MCP Client (stdio)"]
-  C --> S["MSX Helper MCP Server\n(mcp-server/src/index.js)"]
+  C --> S["MCAPS Copilot Tools MCP Server\n(mcp-server/src/index.js)"]
 
   S --> T["Tool Router\n(registerTools in src/tools.js)"]
   T --> A["Auth Service\n(src/auth.js)\nAzure CLI token (az account get-access-token)"]
@@ -108,3 +110,19 @@ When user asks for cross-source evidence (for example, “summarize customer blo
 2. Run WorkIQ retrieval first for M365 evidence.
 3. Read CRM milestones/tasks with `msx-crm` tools.
 4. Return a joined output with explicit sections for `CRM facts` and `M365 evidence`.
+
+## Copilot CLI Example Flow (Simple)
+
+Use this when you want one practical loop with minimal setup overhead.
+
+1. Open Copilot CLI in this repo (`copilot`) where MCP servers are already configured.
+2. State role + objective in one line (example: “Role: Solution Engineer. Summarize blocker risk for Contoso this week.”).
+3. Ask for WorkIQ evidence first (`ask_work_iq`) limited to timeframe + source types.
+4. Ask for CRM facts second (`msx-crm` milestones/tasks/opportunity status).
+5. Ask for a final merged brief in two sections only: `CRM facts` and `M365 evidence`.
+
+For write-intent changes, keep the same flow but require explicit approval before any create/update/close action.
+
+## References
+
+- WorkIQ overview: https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/workiq-overview
