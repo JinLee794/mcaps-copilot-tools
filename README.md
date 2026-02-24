@@ -95,6 +95,15 @@ This server runs on stdio transport and can be wired into MCP-compatible clients
 
 For WorkIQ-heavy workflows, Copilot CLI is an ideal integration point to orchestrate role skills + `msx-crm` + `ask_work_iq` in a single agentic loop.
 
+### Startup Flow (Recommended)
+
+1. Open and review the MCP server config: [.vscode/mcp.json](.vscode/mcp.json).
+2. In your MCP-capable client/editor, **start** the configured MCP servers from that file.
+3. Run your workflow using either:
+	- the GitHub Copilot session window in VS Code, or
+	- GitHub Copilot CLI (`copilot`) from the repo root.
+4. Verify tool routing by using `msx-crm` for CRM facts and `ask_work_iq` for M365 evidence.
+
 ## Recommended Copilot Workflow (MCP-first)
 
 - Use the configured workspace MCP server (`.vscode/mcp.json`, server name `msx-crm`) for CRM operations.
