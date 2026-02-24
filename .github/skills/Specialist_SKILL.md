@@ -1,3 +1,9 @@
+---
+name: specialist-msx-ops
+description: 'Specialist (STU) operating skill for MSX/MCEM focused on pipeline creation, stage 2-3 opportunity progression, uncommitted milestone ownership, and warm handoff to CSU.'
+argument-hint: 'Provide opportunity/milestone IDs, pipeline stage, commitment state, and the outcome needed'
+---
+
 # Agent Skill Profile
 
 > **Purpose**: This SKILL.md defines role-specific responsibilities and communication patterns for managing **Microsoft Sales Experience (MSX)** in alignment with the **Microsoft Customer Engagement Methodology (MCEM)**.

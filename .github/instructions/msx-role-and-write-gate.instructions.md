@@ -1,5 +1,6 @@
 ---
 description: "Use for MSX/MCEM CRM operations, milestone/task updates, role-based workflow routing, and any create/update/close action via MCP tools. Enforces role mapping from CRM user profile and human-in-the-loop confirmation before write operations."
+applyTo: "mcp-server/**"
 ---
 # MSX Role Mapping + Write Confirmation Gate
 
