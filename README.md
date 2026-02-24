@@ -144,8 +144,6 @@ Reference:
 
 Big thanks to the original MSX Helper project for the foundation and inspiration that helped shape this into an MCP server:
 
-- Source repo releases: [https://github.com/mitulashah/msx-helper/releases/latest](https://github.com/mitulashah/msx-helper/releases/latest)
-
 ## License
 
 MIT (see `mcp-server/package.json`)
