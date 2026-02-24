@@ -11,17 +11,35 @@ flowchart LR
   U[User / Copilot Chat] --> C["MCP Client (stdio)"]
   C --> S["MCAPS Copilot Tools MCP Server\n(mcp-server/src/index.js)"]
 
+  C --> F["Local Filesystem Control Plane\n(.agent-memory + .vscode overlays)"]
+
   S --> T["Tool Router\n(registerTools in src/tools.js)"]
   T --> A["Auth Service\n(src/auth.js)\nAzure CLI token (az account get-access-token)"]
   T --> R["CRM Client\n(src/crm.js)\nrequest / requestAllPages"]
 
   A --> R
   R --> D[("MSX CRM / Dynamics 365\n/api/data/v9.2")]
+  F --> C
 
   T --> O["Tool Responses\n(JSON text payload)"]
   O --> C
   C --> U
 ```
+
+## Local Filesystem as Orchestration Substrate
+
+For this repository, orchestration state is intentionally local-first and workspace-bound.
+
+- `.agent-memory/` stores session/working/durable memory used to continue and shape runs.
+- `.vscode/mcp.json` is the MCP baseline and `.vscode/mcp.runtime.overlay.json` is runtime delta.
+- Copilot CLI session continuity and UI hydration rely on these files, not a remote persistence service.
+
+### Reliability Constraints
+
+- Use atomic file updates for JSON state artifacts (write temp then rename).
+- Guard concurrent writes with per-resource locks and deterministic same-thread queue behavior.
+- Validate and sanitize all filesystem paths to remain under repo root.
+- If a persistence file is corrupt/unavailable, continue read-only/degraded and surface diagnostics.
 
 ## MCP Routing Model (Recommended)
 
@@ -32,6 +50,15 @@ flowchart LR
 - Keep systems distinct in outputs:
   - CRM = system-of-record state.
   - WorkIQ = supporting evidence and context.
+
+## Role-Skill Binding + Context Stack Transparency
+
+- Selected workflow role must map to local skill file under `.github/skills/<Role>_SKILL.md`.
+- Execution context should explicitly include the resolved skill contract alongside user prompt and repo instructions.
+- UI should expose a collapsible Context Stack panel showing:
+  - active role and mapped skill file,
+  - key prompt/context blocks used for orchestration,
+  - provenance labels (`user input`, `repo instruction`, `skill`, `derived`).
 
 ## Read Path (Current)
 
@@ -68,7 +95,7 @@ sequenceDiagram
 
 ## Update Path (Current Implementation)
 
-Update-oriented tools validate inputs and build payloads but currently return dry-run previews (`mock: true`) and do **not** write to CRM.
+Update-oriented tools validate inputs and execute CRM write operations.
 
 ```mermaid
 sequenceDiagram
@@ -78,11 +105,12 @@ sequenceDiagram
 
   User->>MCP: Invoke update_milestone / create_task / update_task / close_task
   MCP->>MCP: Validate IDs + build payload
-  Note over MCP,CRM: Current behavior in src/tools.js
-  MCP-->>User: { mock: true, message: "[DRY RUN] ...", payload: ... }
+  MCP->>CRM: POST/PATCH (validated payload)
+  CRM-->>MCP: success/error response
+  MCP-->>User: { success: true } or structured error
 ```
 
-### Update-Oriented Tools (Dry Run)
+### Update-Oriented Tools
 - `create_task`
 - `update_task`
 - `close_task`

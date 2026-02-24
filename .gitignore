@@ -29,3 +29,7 @@ temp/
 # OS / editor
 .DS_Store
 .vscode/*.code-workspace
+.vscode/.mcp-cli.json
+
+# Local agent memory (untracked)
+.agent-memory/

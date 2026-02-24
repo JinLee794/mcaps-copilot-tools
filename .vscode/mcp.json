@@ -19,6 +19,13 @@
 				"mcp"
 			],
 			"type": "stdio"
+		},
+		"CopilotKit MCP": {
+			"command": "npx",
+			"args": [
+				"mcp-remote",
+				"https://mcp.copilotkit.ai"
+			]
 		}
 	},
 	"inputs": []

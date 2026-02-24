@@ -30,6 +30,22 @@ Use this repository as an MCP-first workflow.
 - Use `.github/skills/WorkIQ_Query_Scoping_SKILL.md` as the canonical execution playbook for fact mapping, clarifying questions, defaults, two-pass retrieval, and sensitivity boundaries.
 - If role mapping and WorkIQ scoping both apply, resolve role first, then apply WorkIQ scoping before retrieval.
 
+## Local Agent Memory Retrieval
+
+- Use local structured memory at `.agent-memory/` for context recall when relevant to the user request.
+- Retrieve in this order: `session` → `working` → `durable`.
+- Apply hard filters before ranking when available (`scope`, `kind`, `tags`, `entities`).
+- Prefer lexical retrieval first; only use semantic fallback if lexical results are weak.
+- Keep retrieval context token-efficient by using limit + token budget packing.
+- Promote only validated/stable `fact` or `decision` memories to `durable`; avoid promoting tentative notes.
+- Do not store secrets, tokens, or credentials in agent memory.
+- Use local scripts from `mcp-server` for memory operations:
+	- `npm run memory:add -- --scope working --kind fact --summary "..." --content "..."`
+	- `npm run memory:find -- --query "..." --scope working --limit 8 --tokenBudget 1200`
+	- `npm run memory:promote -- --id <memoryId> --fromScope session`
+	- `npm run memory:weekly` (weekly dry-run compaction report)
+	- `npm run memory:weekly:apply` (weekly apply-mode compaction)
+
 ## Response Expectations
 
 - Keep outputs concise and action-oriented.

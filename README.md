@@ -42,9 +42,7 @@ The server currently includes tools to:
 - run read-only OData queries (`crm_query`, `crm_get_record`)
 - list opportunities and milestones (`list_opportunities`, `get_milestones`)
 - return render-ready views for timeline/cost/diff experiences (`view_milestone_timeline`, `view_opportunity_cost_trend`, `view_staged_changes_diff`)
-- stage write-oriented task/milestone operations (`create_task`, `update_task`, `close_task`, `update_milestone`)
-
-> Note: write tools are currently configured as dry-run responses in code while testing is in progress.
+- perform write-oriented task/milestone operations (`create_task`, `update_task`, `close_task`, `update_milestone`)
 
 ### Role skills for MCAPS workflows
 
@@ -76,12 +74,36 @@ npm test
 npm start
 ```
 
+## Agentic Frontend (Electron MVP)
+
+A local Electron-first frontend now exists under `frontend/` with:
+
+- Electron runtime (main + preload + renderer)
+- local orchestration API with AG-UI-compatible SSE at `POST /api/copilot/run`
+- role-skill binding to `.github/skills/*.md` with write-intent approval guard
+- runtime MCP manager backed by `.vscode/mcp.json` + `.vscode/mcp.runtime.overlay.json`
+- WorkIQ Context Explorer and tool-trace/context-stack views in renderer
+
+Run locally:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+This launches the Electron app and starts orchestration APIs on `http://127.0.0.1:3100`.
+
+### Runtime Notes
+
+- The orchestration API emits normalized AG-UI lifecycle/tool/state/activity events.
+- `copilotkit` is treated as expected MCP baseline and surfaced in diagnostics if unavailable.
+- Run requests support `provider: "copilot-sdk" | "copilot-cli"`.
+- `copilot-sdk` is the primary provider. If GitHub Packages auth is unavailable, set:
+	- `COPILOT_SDK_ADAPTER_MODULE=./src/main/copilot-sdk-adapter.local.js`
+	- this uses a local bridge that executes `copilot chat --message ...`.
+
 ## Configuration
-
-The server reads configuration from environment variables:
-
-- `MSX_CRM_URL` (default: `https://microsoftsales.crm.dynamics.com`)
-- `MSX_TENANT_ID` (default: `72f988bf-86f1-41af-91ab-2d7cd011db47`)
 
 Authentication is performed through Azure CLI. Make sure you are signed in first:
 
