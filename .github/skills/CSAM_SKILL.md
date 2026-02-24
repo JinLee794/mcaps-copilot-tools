@@ -1,3 +1,9 @@
+---
+name: csam-msx-ops
+description: 'Customer Success Account Manager operating skill for MSX/MCEM focused on committed milestone delivery, customer value realization, adoption tracking, and CSU execution orchestration.'
+argument-hint: 'Provide opportunity/milestone IDs, customer health signals, delivery status, and the outcome needed'
+---
+
 # Agent Skill Profile
 
 > **Purpose**: This SKILL.md defines role-specific responsibilities and communication patterns for managing **Microsoft Sales Experience (MSX)** in alignment with the **Microsoft Customer Engagement Methodology (MCEM)**.
