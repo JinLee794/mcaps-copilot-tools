@@ -5,6 +5,7 @@
 // Supports save via IPC skill:save channel.
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { parseSkillFile } from '../../shared/skills-parser';
 
@@ -153,7 +154,7 @@ export function SkillEditor({ skillId, initialContent, onClose, onSave }: SkillE
                 </>
               ) : (
                 <div className="skill-preview-error">
-                  ⚠️ Could not parse skill file. Ensure YAML frontmatter is present
+                  <AlertTriangle size={16} className="inline-icon" /> Could not parse skill file. Ensure YAML frontmatter is present
                   with at least a <code>name</code> field.
                 </div>
               )}

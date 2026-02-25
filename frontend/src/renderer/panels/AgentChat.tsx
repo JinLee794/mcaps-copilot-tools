@@ -1,5 +1,6 @@
 // Agent Chat — message thread + tool call log + HITL approval (§5.3)
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { MessageSquare, Bot, SendHorizonal } from 'lucide-react';
 import { ToolCallLog } from '../components/ToolCallLog';
 import { ApprovalCard } from '../components/ApprovalCard';
 import { CliActivityStream } from '../components/CliActivityStream';
@@ -116,7 +117,7 @@ export function AgentChat() {
       <div className="chat-messages">
         {messages.length === 0 && (
           <div className="empty-state">
-            <div className="empty-state-icon">💬</div>
+            <MessageSquare size={32} className="empty-state-icon" />
             <div className="empty-state-text">What would you like to do?</div>
           </div>
         )}
@@ -124,7 +125,7 @@ export function AgentChat() {
         {messages.map((msg) => (
           <div key={msg.id} className={`chat-message ${msg.role}`}>
             <div className="chat-message-header">
-              {msg.role === 'user' ? 'You' : '🤖 Copilot'} —{' '}
+              {msg.role === 'user' ? 'You' : <><Bot size={14} className="inline-icon" /> Copilot</>} —{' '}
               {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </div>
             {msg.content}
@@ -163,7 +164,7 @@ export function AgentChat() {
             onKeyDown={handleKeyDown}
           />
           <button className="chat-send-btn" onClick={handleSend}>
-            ▶
+            <SendHorizonal size={16} />
           </button>
         </div>
       </div>

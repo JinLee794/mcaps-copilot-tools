@@ -4,6 +4,7 @@
 // Uses lightweight SVG overlay — no D3 dependency for simplicity.
 
 import React, { useMemo } from 'react';
+import { Flame, ArrowRight, Pause } from 'lucide-react';
 
 export interface CorrelationEdge {
   from: string;      // Source node ID (e.g., "emails")
@@ -95,7 +96,7 @@ export function CorrelationGraph({ edges, riskLevel, momentum }: CorrelationGrap
           Risk: {riskLevel}
         </span>
         <span className="correlation-badge" data-momentum={momentum}>
-          {momentum === 'accelerating' ? '🔥' : momentum === 'steady' ? '→' : '⏸'} {momentum}
+          {momentum === 'accelerating' ? <Flame size={12} /> : momentum === 'steady' ? <ArrowRight size={12} /> : <Pause size={12} />} {momentum}
         </span>
       </div>
     </div>

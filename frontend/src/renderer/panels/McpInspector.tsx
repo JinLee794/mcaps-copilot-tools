@@ -1,5 +1,6 @@
 // MCP Tool Inspector — modal overlay showing active servers and tools (§5.4)
 import React, { useState, useEffect } from 'react';
+import { X, Circle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useToolRegistry } from '../hooks/useToolRegistry';
 
 interface McpInspectorProps {
@@ -32,7 +33,7 @@ export function McpInspector({ onClose }: McpInspectorProps) {
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <span className="modal-title">MCP Tool Inspector</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <button className="modal-close" onClick={onClose}><X size={18} /></button>
         </div>
         <div className="modal-body">
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
@@ -46,10 +47,10 @@ export function McpInspector({ onClose }: McpInspectorProps) {
           {Object.entries(toolsByServer).map(([serverName, serverTools]) => (
             <div key={serverName} className="server-card">
               <div className="server-card-header">
-                <span style={{ color: 'var(--accent-green)' }}>●</span>
+                <Circle size={10} fill="var(--accent-green)" color="var(--accent-green)" />
                 <span className="server-name">{serverName}</span>
                 <span className="server-type">
-                  STDIO · ✓ {serverTools.length} tools
+                  STDIO · <CheckCircle2 size={12} className="inline-icon" /> {serverTools.length} tools
                 </span>
               </div>
               <div className="server-tools">
@@ -66,7 +67,7 @@ export function McpInspector({ onClose }: McpInspectorProps) {
                       );
                     })}
                     <div className="write-warning">
-                      ⚠️ Write tools are LIVE — HITL required BEFORE invocation
+                      <AlertTriangle size={14} className="inline-icon" /> Write tools are LIVE — HITL required BEFORE invocation
                     </div>
                   </>
                 ) : (

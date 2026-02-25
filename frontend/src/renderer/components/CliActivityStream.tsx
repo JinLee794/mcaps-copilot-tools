@@ -1,17 +1,18 @@
 // CliActivityStream — live feed of CLI execution steps (skills, tools, context)
 import React, { useState, useRef, useEffect } from 'react';
+import { BookOpen, FileText, Puzzle, Wrench, Link, Send, Settings, CheckCircle2, ScrollText, ChevronDown, ChevronRight } from 'lucide-react';
 import type { CliActivityEntry, CliActivityKind } from '../../shared/types/AgUiEvent';
 
-const KIND_ICONS: Record<CliActivityKind, string> = {
-  skill_loaded: '📘',
-  instruction_loaded: '📄',
-  context_added: '🧩',
-  tool_registered: '🔧',
-  session_created: '🔗',
-  prompt_sent: '📨',
-  tool_invoked: '⚙️',
-  tool_completed: '✅',
-  cli_log: '📝',
+const KIND_ICONS: Record<CliActivityKind, React.ReactNode> = {
+  skill_loaded: <BookOpen size={12} />,
+  instruction_loaded: <FileText size={12} />,
+  context_added: <Puzzle size={12} />,
+  tool_registered: <Wrench size={12} />,
+  session_created: <Link size={12} />,
+  prompt_sent: <Send size={12} />,
+  tool_invoked: <Settings size={12} />,
+  tool_completed: <CheckCircle2 size={12} />,
+  cli_log: <ScrollText size={12} />,
 };
 
 interface CliActivityStreamProps {
@@ -44,7 +45,7 @@ export function CliActivityStream({ entries }: CliActivityStreamProps) {
         className="cli-activity-header"
         onClick={() => setExpanded((v) => !v)}
       >
-        <span className="cli-activity-toggle">{expanded ? '▾' : '▸'}</span>
+        <span className="cli-activity-toggle">{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
         <span>Agent Activity</span>
         <span className="cli-activity-count">{entries.length}</span>
       </div>

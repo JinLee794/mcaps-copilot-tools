@@ -1,14 +1,19 @@
 // Renderer entry — three-panel layout with IPC-based transport (§4, §8)
 import React from 'react';
+import { Sparkles, Server, Terminal, Activity } from 'lucide-react';
 import { SkillsPanel } from './panels/SkillsPanel';
 import { ResearchCanvas } from './panels/ResearchCanvas';
 import { AgentChat } from './panels/AgentChat';
 import { McpInspector } from './panels/McpInspector';
+import { MilestonesPanel } from './panels/MilestonesPanel';
 import { AgUiTransportProvider, useAgUiTransport } from './hooks/useAgUiTransport';
 import './styles/index.css';
 
+type CanvasView = 'research' | 'milestones';
+
 function AppShell() {
   const [showMcpInspector, setShowMcpInspector] = React.useState(false);
+  const [canvasView, setCanvasView] = React.useState<CanvasView>('research');
   const transport = useAgUiTransport();
 
   return (
@@ -16,7 +21,7 @@ function AppShell() {
         {/* Header bar */}
         <header className="app-header">
           <div className="header-left">
-            <span className="app-logo">◉</span>
+            <Sparkles size={18} className="app-logo" />
             <h1 className="app-title">Copilot Sales Assistant</h1>
           </div>
           <div className="header-right">
@@ -33,7 +38,22 @@ function AppShell() {
             <SkillsPanel onOpenMcpInspector={() => setShowMcpInspector(true)} />
           </div>
           <div className="panel panel-canvas">
-            <ResearchCanvas />
+            {/* Canvas view switcher */}
+            <div className="canvas-tabs">
+              <button
+                className={`canvas-tab ${canvasView === 'research' ? 'active' : ''}`}
+                onClick={() => setCanvasView('research')}
+              >
+                Research
+              </button>
+              <button
+                className={`canvas-tab ${canvasView === 'milestones' ? 'active' : ''}`}
+                onClick={() => setCanvasView('milestones')}
+              >
+                Milestones
+              </button>
+            </div>
+            {canvasView === 'research' ? <ResearchCanvas /> : <MilestonesPanel />}
           </div>
           <div className="panel panel-chat">
             <AgentChat />
@@ -43,13 +63,13 @@ function AppShell() {
         {/* Status bar */}
         <footer className="status-bar">
           <span className="status-item" onClick={() => setShowMcpInspector(true)}>
-            ⬤ mcp.json: {transport.toolCalls.length} tool calls
+            <Server size={12} /> mcp.json: {transport.toolCalls.length} tool calls
           </span>
           <span className="status-item">
-            ● Copilot CLI {transport.connected ? 'connected' : 'disconnected'}
+            <Terminal size={12} /> Copilot CLI {transport.connected ? 'connected' : 'disconnected'}
           </span>
           <span className="status-item">
-            Status: {transport.state.status}
+            <Activity size={12} /> {transport.state.status}
           </span>
         </footer>
 

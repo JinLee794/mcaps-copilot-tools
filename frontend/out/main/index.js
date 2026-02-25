@@ -516,6 +516,18 @@ let activeRunId = null;
 let activeSession = null;
 let activeRecorder = null;
 let copilotClient = null;
+function emitCliActivity(window, runId, kind, label, detail) {
+  window.webContents.send(
+    "ag-ui:event",
+    createAgUiEvent(AgUiEventType.CUSTOM, runId, {
+      id: `cli-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      kind,
+      label,
+      detail,
+      timestamp: Date.now()
+    })
+  );
+}
 function getClient(mcpRegistry2) {
   if (!copilotClient) {
     copilotClient = new CopilotClient(mcpRegistry2, {
@@ -538,8 +550,11 @@ function registerIpcHandlers(mcpRegistry2, skillsLoader2) {
       const client = getClient(mcpRegistry2);
       const skill = skillsLoader2.getSkill(params.skill);
       const systemPrompt = skill?.rawContent ?? `You are a sales assistant. Run the "${params.skill}" skill.`;
+      emitCliActivity(window, runId, "skill_loaded", `Skill loaded: ${params.skill}`, systemPrompt.slice(0, 200));
       const allTools = mcpRegistry2.getTools().map((t) => t.name);
       const toolDefs = buildToolDefinitions(allTools, mcpRegistry2);
+      emitCliActivity(window, runId, "tool_registered", `${toolDefs.length} tools registered`, allTools.join(", "));
+      emitCliActivity(window, runId, "context_added", "System prompt configured");
       const session = await client.createSession({
         model: "gpt-4.5",
         systemMessage: systemPrompt,
@@ -547,6 +562,7 @@ function registerIpcHandlers(mcpRegistry2, skillsLoader2) {
         streaming: true
       });
       activeSession = session;
+      emitCliActivity(window, runId, "session_created", `Session created: ${session.id}`);
       const workspaceRoot = mcpRegistry2["configPath"] ? mcpRegistry2["configPath"].replace("/.vscode/mcp.json", "") : process.cwd();
       const recorder = new SessionRecorder(
         session.id,
@@ -561,6 +577,22 @@ function registerIpcHandlers(mcpRegistry2, skillsLoader2) {
           type: sdkEvent.type,
           data: sdkEvent.data
         }, runId);
+        if (sdkEvent.type === "tool.request") {
+          emitCliActivity(
+            window,
+            runId,
+            "tool_invoked",
+            `Calling: ${String(sdkEvent.data["name"] ?? "unknown")}`,
+            sdkEvent.data["args"] ? JSON.stringify(sdkEvent.data["args"]).slice(0, 300) : void 0
+          );
+        } else if (sdkEvent.type === "tool.result") {
+          emitCliActivity(
+            window,
+            runId,
+            "tool_completed",
+            `Completed: ${String(sdkEvent.data["name"] ?? "unknown")}`
+          );
+        }
         if (sdkEvent.type === "permission.request") {
           window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.INTERRUPT, runId, {
             message: sdkEvent.data["message"],
@@ -569,6 +601,7 @@ function registerIpcHandlers(mcpRegistry2, skillsLoader2) {
           }));
         }
       });
+      emitCliActivity(window, runId, "prompt_sent", "Prompt sent to agent", params.prompt.slice(0, 200));
       await session.send({ prompt: params.prompt });
     } catch (err) {
       window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.RUN_ERROR, runId, {

@@ -1,5 +1,6 @@
 // Research Canvas — live data source nodes + correlation + output (§5.2)
 import React, { useMemo } from 'react';
+import { Mail, Mic, MessageSquare, FolderOpen, Building2, ClipboardList, X } from 'lucide-react';
 import { SourceNodeCard } from '../components/SourceNode';
 import { OutputPanel } from '../components/OutputPanel';
 import { CorrelationGraph } from '../components/CorrelationGraph';
@@ -39,7 +40,7 @@ export function ResearchCanvas() {
         <span>Research Canvas</span>
         {state.status === 'running' && (
           <button className="btn-secondary" style={{ width: 'auto', padding: '2px 8px', marginTop: 0 }}>
-            ✕ Cancel
+            <X size={14} /> Cancel
           </button>
         )}
       </div>
@@ -66,14 +67,14 @@ export function ResearchCanvas() {
         {/* Data source nodes — 2-column grid */}
         <div className="source-nodes">
           {/* WorkIQ sources */}
-          <SourceNodeCard icon="📧" title="Emails" node={state.sources.emails} />
-          <SourceNodeCard icon="🎙️" title="Transcripts" node={state.sources.transcripts} />
-          <SourceNodeCard icon="💬" title="Teams" node={state.sources.teams} />
-          <SourceNodeCard icon="📁" title="SharePoint" node={state.sources.sharepoint} />
+          <SourceNodeCard icon={<Mail size={16} />} title="Emails" node={state.sources.emails} />
+          <SourceNodeCard icon={<Mic size={16} />} title="Transcripts" node={state.sources.transcripts} />
+          <SourceNodeCard icon={<MessageSquare size={16} />} title="Teams" node={state.sources.teams} />
+          <SourceNodeCard icon={<FolderOpen size={16} />} title="SharePoint" node={state.sources.sharepoint} />
 
           {/* MSX/CRM sources */}
-          <SourceNodeCard icon="🏢" title="Milestones" node={state.sources.milestones} />
-          <SourceNodeCard icon="📋" title="Tasks" node={state.sources.tasks} />
+          <SourceNodeCard icon={<Building2 size={16} />} title="Milestones" node={state.sources.milestones} />
+          <SourceNodeCard icon={<ClipboardList size={16} />} title="Tasks" node={state.sources.tasks} />
         </div>
 
         {/* Correlation graph overlay */}

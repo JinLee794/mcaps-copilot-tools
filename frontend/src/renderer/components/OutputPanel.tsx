@@ -1,5 +1,6 @@
 // OutputPanel — streamed markdown output with citations (§5.2)
 import React, { useCallback } from 'react';
+import { FileText, Copy, Circle } from 'lucide-react';
 import Markdown from 'react-markdown';
 
 interface Citation {
@@ -23,7 +24,7 @@ export function OutputPanel({ markdown, citations, status }: OutputPanelProps) {
     return (
       <div className="output-panel-empty">
         <div className="empty-state">
-          <div className="empty-state-icon">📝</div>
+          <FileText size={32} className="empty-state-icon" />
           <div className="empty-state-text">
             Output will appear here once a skill runs.
           </div>
@@ -36,14 +37,14 @@ export function OutputPanel({ markdown, citations, status }: OutputPanelProps) {
     <div className="output-panel">
       <div className="output-panel-header">
         <span>Output</span>
-        {status === 'streaming' && <span className="output-streaming">● Streaming</span>}
+        {status === 'streaming' && <span className="output-streaming"><Circle size={8} fill="currentColor" /> Streaming</span>}
         {status === 'complete' && (
           <button
             className="btn-secondary"
             style={{ width: 'auto', padding: '2px 8px', marginTop: 0 }}
             onClick={handleCopy}
           >
-            📋 Copy
+            <Copy size={14} /> Copy
           </button>
         )}
       </div>

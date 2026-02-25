@@ -1,5 +1,6 @@
 // Skills Panel — skill list, tuner, run button, workflow registry (§5.1, §13.8)
 import React, { useState, useCallback, useEffect } from 'react';
+import { Zap, Play, Loader2, Settings, Plug, Star, Pencil, FileText, Camera } from 'lucide-react';
 import { useSkillLoader } from '../hooks/useSkillLoader';
 import { SkillEditor } from '../components/SkillEditor';
 import type { WorkflowRegistryEntry } from '../../shared/types/CapturedWorkflow';
@@ -66,7 +67,7 @@ export function SkillsPanel({ onOpenMcpInspector }: SkillsPanelProps) {
             className={`panel-tab ${activeTab === 'workflows' ? 'active' : ''}`}
             onClick={() => setActiveTab('workflows')}
           >
-            ⚡ Workflows
+            <Zap size={12} className="inline-icon" /> Workflows
           </button>
         </div>
       </div>
@@ -84,14 +85,14 @@ export function SkillsPanel({ onOpenMcpInspector }: SkillsPanelProps) {
                 >
                   <span className="skill-indicator" />
                   <span>{skill.name}</span>
-                  <span className="skill-run-btn">▶ Run</span>
+                  <span className="skill-run-btn"><Play size={12} /> Run</span>
                 </li>
               ))}
             </ul>
 
             {skills.length === 0 && (
               <div className="empty-state">
-                <div className="empty-state-icon">📄</div>
+                <FileText size={32} className="empty-state-icon" />
                 <div className="empty-state-text">
                   No skills found.<br />
                   Drop a SKILLS.md to get started.
@@ -179,7 +180,7 @@ export function SkillsPanel({ onOpenMcpInspector }: SkillsPanelProps) {
                         checked={runMode === 'workflow'}
                         onChange={() => setRunMode('workflow')}
                       />
-                      ⚡ Workflow
+                      <Zap size={12} className="inline-icon" /> Workflow
                     </label>
                   </div>
                 </div>
@@ -195,15 +196,15 @@ export function SkillsPanel({ onOpenMcpInspector }: SkillsPanelProps) {
                 </div>
 
                 <button className="btn-primary" onClick={handleRun} disabled={isRunning}>
-                  {isRunning ? '⟳ Running...' : '▶ Run Skill'}
+                  {isRunning ? <><Loader2 size={14} className="spin" /> Running...</> : <><Play size={14} /> Run Skill</>}
                 </button>
 
                 <button className="btn-secondary" onClick={handleEditSkill}>
-                  ⚙ Edit SKILLS.md
+                  <Settings size={14} className="inline-icon" /> Edit SKILLS.md
                 </button>
 
                 <button className="btn-secondary" onClick={onOpenMcpInspector}>
-                  🔌 MCP Tools
+                  <Plug size={14} className="inline-icon" /> MCP Tools
                 </button>
               </div>
             )}
@@ -219,7 +220,7 @@ export function SkillsPanel({ onOpenMcpInspector }: SkillsPanelProps) {
                   <li key={wf.id} className="workflow-item">
                     <div className="workflow-item-header">
                       <span className="workflow-name">
-                        {wf.starred && '★ '}
+                        {wf.starred && <><Star size={12} className="inline-icon starred" /> </>}
                         {wf.name}
                       </span>
                     </div>
@@ -230,10 +231,10 @@ export function SkillsPanel({ onOpenMcpInspector }: SkillsPanelProps) {
                     </div>
                     <div className="workflow-item-actions">
                       <button className="btn-primary" style={{ width: 'auto', padding: '2px 8px' }}>
-                        ▶ Run
+                        <Play size={12} /> Run
                       </button>
                       <button className="btn-secondary" style={{ width: 'auto', padding: '2px 8px' }}>
-                        ✎ Edit
+                        <Pencil size={12} /> Edit
                       </button>
                     </div>
                   </li>
@@ -241,10 +242,10 @@ export function SkillsPanel({ onOpenMcpInspector }: SkillsPanelProps) {
               </ul>
             ) : (
               <div className="empty-state">
-                <div className="empty-state-icon">⚡</div>
+                <Zap size={32} className="empty-state-icon" />
                 <div className="empty-state-text">
                   No compiled workflows yet.<br />
-                  Run a skill in Explore mode, then click "📸 Capture" to compile.
+                  Run a skill in Explore mode, then click <Camera size={12} className="inline-icon" /> Capture to compile.
                 </div>
               </div>
             )}

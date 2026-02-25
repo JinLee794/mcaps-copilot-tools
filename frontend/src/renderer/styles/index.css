@@ -68,8 +68,9 @@ body {
 }
 
 .app-logo {
-  font-size: 18px;
   color: var(--accent-blue);
+  display: flex;
+  align-items: center;
 }
 
 .app-title {
@@ -166,7 +167,7 @@ body {
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .status-item:hover {
@@ -217,6 +218,9 @@ body {
   font-size: 11px;
   color: var(--accent-green);
   opacity: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .skill-item:hover .skill-run-btn {
@@ -323,6 +327,40 @@ body {
   50% { opacity: 0.4; }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Utility: inline icon alignment ──────────────────────────── */
+
+.inline-icon {
+  display: inline-block;
+  vertical-align: -2px;
+}
+
+.inline-icon.starred {
+  color: var(--accent-amber);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ── Buttons: icon alignment ─────────────────────────────────── */
+
+.btn-primary,
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-primary svg,
+.btn-secondary svg {
+  flex-shrink: 0;
+}
+
 .source-nodes {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -343,9 +381,17 @@ body {
 .source-node.loaded { border-color: var(--accent-green); }
 .source-node.correlated { border-color: var(--accent-teal); }
 
+.source-node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .source-node-icon {
-  font-size: 16px;
-  margin-bottom: 4px;
+  color: var(--accent-blue);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .source-node-title {
@@ -365,6 +411,25 @@ body {
   color: var(--accent-teal);
   margin-top: 4px;
   font-style: italic;
+}
+
+.source-node-spinner {
+  animation: spin 1s linear infinite;
+  color: var(--accent-amber);
+  display: flex;
+  margin-left: auto;
+}
+
+.skill-preview-error {
+  color: var(--accent-amber);
+  padding: 12px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid var(--accent-amber);
+  border-radius: var(--radius);
+  font-size: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .output-section {
@@ -472,6 +537,14 @@ body {
   border-radius: var(--radius);
   cursor: pointer;
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s;
+}
+
+.chat-send-btn:hover {
+  opacity: 0.85;
 }
 
 /* ── Tool Call Log ───────────────────────────────────────────── */
@@ -482,13 +555,16 @@ body {
   padding-top: 12px;
 }
 
-.tool-call-log-title {
+.tool-call-log-header {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   color: var(--text-muted);
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .tool-call-item {
@@ -503,10 +579,15 @@ body {
   flex-shrink: 0;
 }
 
-.tool-call-status.success { color: var(--accent-green); }
-.tool-call-status.loading { color: var(--accent-amber); }
-.tool-call-status.error { color: var(--accent-red); }
-.tool-call-status.queued { color: var(--text-muted); }
+.tool-status-icon.pending { color: var(--accent-amber); }
+.tool-status-icon.success { color: var(--accent-green); }
+.tool-status-icon.error { color: var(--accent-red); }
+
+.tool-status-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
 
 .tool-call-name {
   color: var(--text-secondary);
@@ -529,7 +610,7 @@ body {
   border-radius: var(--radius);
 }
 
-.approval-card-header {
+.approval-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -537,6 +618,11 @@ body {
   font-weight: 600;
   color: var(--accent-amber);
   margin-bottom: 8px;
+}
+
+.approval-icon {
+  color: var(--accent-amber);
+  flex-shrink: 0;
 }
 
 .approval-card-body {
@@ -676,6 +762,10 @@ body {
   margin-bottom: 8px;
 }
 
+.server-card-header svg {
+  flex-shrink: 0;
+}
+
 .server-name {
   font-size: 13px;
   font-weight: 600;
@@ -708,6 +798,9 @@ body {
   border-radius: 4px;
   font-size: 11px;
   color: var(--accent-amber);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* ── Progress Bar ────────────────────────────────────────────── */
@@ -740,9 +833,9 @@ body {
 }
 
 .empty-state-icon {
-  font-size: 32px;
   margin-bottom: 12px;
-  opacity: 0.5;
+  opacity: 0.4;
+  color: var(--text-muted);
 }
 
 .empty-state-text {
@@ -995,6 +1088,9 @@ body {
   padding: 2px 8px;
   border-radius: 10px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .correlation-badge.risk-high {
@@ -1216,4 +1312,425 @@ body {
 
 .cli-activity-kind-session_created .cli-activity-label {
   color: var(--accent-teal);
+}
+
+/* ── Canvas View Tabs ──────────────────────────────────────────────── */
+
+.canvas-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 12px;
+  background: var(--bg-secondary);
+}
+
+.canvas-tab {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.canvas-tab:hover {
+  color: var(--text-primary);
+}
+
+.canvas-tab.active {
+  color: var(--accent-blue);
+  border-bottom-color: var(--accent-blue);
+}
+
+/* ── Milestones Table ──────────────────────────────────────────────── */
+
+.milestones-panel-content {
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.ms-table-wrapper {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ms-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.ms-table thead {
+  background: var(--bg-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.ms-table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.ms-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  vertical-align: middle;
+}
+
+/* Column widths */
+.col-expand { width: 32px; }
+.col-name { min-width: 200px; }
+.col-category { width: 160px; }
+.col-date { width: 120px; }
+.col-status { width: 120px; }
+.col-actions { width: 100px; text-align: right; }
+
+/* ── Milestone Row ─────────────────────────────────────────────────── */
+
+.milestone-row {
+  background: var(--bg-primary);
+  cursor: default;
+}
+
+.milestone-row:hover {
+  background: color-mix(in srgb, var(--accent-blue) 6%, var(--bg-primary));
+}
+
+.milestone-row.expanded {
+  background: color-mix(in srgb, var(--accent-blue) 4%, var(--bg-primary));
+}
+
+.cell-expand {
+  cursor: pointer;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.cell-expand:hover {
+  color: var(--accent-blue);
+}
+
+.cell-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Fix: table cell needs block-level display override removed */
+td.cell-name {
+  display: table-cell;
+}
+
+.ms-number {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.ms-title {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cell-date {
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.cell-date .inline-icon {
+  vertical-align: -1px;
+  margin-right: 2px;
+  color: var(--text-muted);
+}
+
+.cell-category {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.cell-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.task-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-right: 6px;
+}
+
+/* ── Status Badges ─────────────────────────────────────────────────── */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-badge.on-track {
+  background: color-mix(in srgb, var(--accent-green) 15%, transparent);
+  color: var(--accent-green);
+}
+
+.status-badge.at-risk {
+  background: color-mix(in srgb, var(--accent-amber) 15%, transparent);
+  color: var(--accent-amber);
+}
+
+.status-badge.blocked {
+  background: color-mix(in srgb, var(--accent-red) 15%, transparent);
+  color: var(--accent-red);
+}
+
+.status-badge.completed {
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  color: var(--text-muted);
+}
+
+.status-badge.not-started {
+  background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+  color: var(--accent-blue);
+}
+
+.status-badge.cancelled {
+  background: color-mix(in srgb, var(--text-muted) 8%, transparent);
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.status-icon { flex-shrink: 0; }
+
+/* ── Task Rows ─────────────────────────────────────────────────────── */
+
+.task-row {
+  background: color-mix(in srgb, var(--bg-secondary) 60%, var(--bg-primary));
+}
+
+.task-row:hover {
+  background: color-mix(in srgb, var(--accent-blue) 5%, var(--bg-secondary));
+}
+
+.cell-indent {
+  width: 32px;
+  border-left: 2px solid color-mix(in srgb, var(--accent-blue) 30%, transparent);
+}
+
+.new-task-row {
+  background: color-mix(in srgb, var(--accent-green) 5%, var(--bg-secondary));
+}
+
+.empty-tasks-label {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 11px;
+  padding: 8px 10px;
+}
+
+/* ── Editable Cells ────────────────────────────────────────────────── */
+
+.editable-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background 0.1s;
+  min-height: 24px;
+  color: var(--text-primary);
+}
+
+.editable-cell:hover {
+  background: color-mix(in srgb, var(--accent-blue) 10%, transparent);
+}
+
+.editable-cell .edit-hint {
+  opacity: 0;
+  color: var(--text-muted);
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.editable-cell:hover .edit-hint {
+  opacity: 0.6;
+}
+
+.editable-cell .placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.editable-cell.editing {
+  background: none;
+  padding: 0;
+}
+
+.cell-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--accent-blue);
+  border-radius: 3px;
+  color: var(--text-primary);
+  padding: 3px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+  min-width: 80px;
+}
+
+.cell-input:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-blue) 30%, transparent);
+}
+
+.cell-select {
+  background: var(--bg-primary);
+  border: 1px solid var(--accent-blue);
+  border-radius: 3px;
+  color: var(--text-primary);
+  padding: 3px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  min-width: 100px;
+}
+
+.cell-select:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-blue) 30%, transparent);
+}
+
+/* ── Action Buttons ────────────────────────────────────────────────── */
+
+.btn-icon {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.1s, background 0.1s;
+}
+
+.btn-icon:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+}
+
+.btn-icon.btn-add:hover {
+  color: var(--accent-green);
+  background: color-mix(in srgb, var(--accent-green) 10%, transparent);
+}
+
+.btn-icon.btn-confirm {
+  color: var(--accent-green);
+}
+
+.btn-icon.btn-confirm:hover {
+  background: color-mix(in srgb, var(--accent-green) 15%, transparent);
+}
+
+.btn-icon.btn-confirm:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.btn-icon.btn-cancel {
+  color: var(--accent-red);
+}
+
+.btn-icon.btn-cancel:hover {
+  background: color-mix(in srgb, var(--accent-red) 15%, transparent);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent-blue);
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.link-btn:hover {
+  color: var(--text-primary);
+}
+
+/* ── Table Footer ──────────────────────────────────────────────────── */
+
+.ms-table-footer {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+/* ── Loading / Empty ───────────────────────────────────────────────── */
+
+.ms-table-loading,
+.ms-table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ── Filter Group ──────────────────────────────────────────────────── */
+
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+}
+
+.filter-select {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* ── Spin animation ────────────────────────────────────────────────── */
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
 }

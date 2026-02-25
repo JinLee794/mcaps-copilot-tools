@@ -1,5 +1,6 @@
 // ApprovalCard — HITL confirmation gate before write operations (§6.3)
 import React, { useState } from 'react';
+import { ShieldAlert, Check, Pencil, X } from 'lucide-react';
 
 interface DiffRow {
   field: string;
@@ -43,7 +44,7 @@ export function ApprovalCard({
   return (
     <div className="approval-card">
       <div className="approval-header">
-        <span className="approval-icon">⚠️</span>
+        <ShieldAlert size={16} className="approval-icon" />
         <span className="approval-title">Approval Required</span>
       </div>
       <div className="approval-body">
@@ -98,11 +99,11 @@ export function ApprovalCard({
       </div>
       <div className="approval-actions">
         <button className="btn-primary" onClick={() => editing ? handleEditApprove() : onApprove()}>
-          ✓ {editing ? 'Save & Approve' : 'Approve'}
+          <Check size={14} /> {editing ? 'Save & Approve' : 'Approve'}
         </button>
         {proposedArgs && !editing && (
           <button className="btn-secondary" onClick={() => setEditing(true)}>
-            ✎ Edit
+            <Pencil size={14} /> Edit
           </button>
         )}
         {editing && (
@@ -111,7 +112,7 @@ export function ApprovalCard({
           </button>
         )}
         <button className="btn-secondary" onClick={onSkip}>
-          ✕ Skip
+          <X size={14} /> Skip
         </button>
       </div>
     </div>
