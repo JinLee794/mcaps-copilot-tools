@@ -135,7 +135,7 @@ This is **fully backwards-compatible** — if not configured, all workflows fall
 
    ```bash
    cd ..
-   git clone https://github.com/JinLee794/mcp-obsidian.git
+   git clone https://github.com/bitbonsai/mcp-obsidian
    cd mcp-obsidian
    npm install
    npm run build
