@@ -1,34 +1,18 @@
-# Agent Skill Profile
-
-> **Purpose**: This SKILL.md defines role-specific responsibilities and communication patterns for managing **Microsoft Sales Experience (MSX)** in alignment with the **Microsoft Customer Engagement Methodology (MCEM)**.
->
-> **Audience**: Field roles and copilots/agents supporting those roles.
->
-> **Scope**: Opportunity & milestone management, pipeline hygiene, role-to-role handoffs, and cross-role orchestration.
-
+---
+name: csam-msx-ops
+description: 'Customer Success Account Manager operating skill for MSX/MCEM. Manages committed milestone health, delivery accountability mapping, commit-gate enforcement, customer success plan alignment, adoption/usage coordination, and Unified constraint early warning. Use when user identifies as CSAM, or asks about delivery ownership, customer health reviews, commit readiness gates, success plan alignment, usage/adoption milestones, or CSAM-vs-CSA authority boundaries.'
+argument-hint: 'Provide opportunity/milestone IDs, delivery state, and the outcome needed'
 ---
 
-## Shared definitions (applies to all roles)
+# Customer Success Account Manager (CSAM) MSX/MCEM Operations
 
-- **MSX record types**
-  - **Opportunity**: The customer engagement container aligned to MCEM stages and exit criteria.
-  - **Milestone**: The execution unit for commitment, delivery, and usage/consumption outcomes.
-  - **Account / Customer Priority / Plan**: The planning context that informs what the opportunity should achieve.
+## Shared Definitions
+- **Opportunity**: customer engagement container aligned to MCEM stages.
+- **Milestone**: execution unit for commitment, delivery, and usage/consumption outcomes.
+- **Uncommitted**: still shaping; not fully resourced for delivery.
+- **Committed**: customer agreement + internal readiness for execution.
 
-- **Commitment language**
-  - **Uncommitted**: Still shaping; not fully resourced/approved for delivery.
-  - **Committed**: Customer agreement + internal readiness; handoff to execution & value realization.
-
-- **Handoff goals**
-  - Preserve continuity (no “reset” of customer context)
-  - Maintain data integrity (MSX is the system of record)
-  - Make next steps explicit (who does what by when)
-
----
-
-## Role: Customer Success Account Manager (CSAM)
-
-### Mission (in MCEM/MSX)
+### Mission (in MCEM/MSX) “reset” ### Mission (in MCEM/MSX)
 Ensure customers **realize value and sustain outcomes** by operationalizing success plans, managing committed milestones through delivery and adoption, and keeping MSX current so the entire account team can execute.
 
 ### Primary accountabilities by MCEM stage
@@ -160,9 +144,16 @@ When this model is explicit, CSAM friction is treated as upstream ambiguity to c
 ## Agent Skills (declarative MCP flows)
 
 ### Runtime contract (current server behavior)
-- **Read tools are live**: `crm_auth_status`, `crm_whoami`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `crm_get_record`, `crm_query`, `get_task_status_options`.
+- **Read tools are live**: `crm_auth_status`, `crm_whoami`, `get_my_active_opportunities`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `crm_get_record`, `crm_query`, `get_task_status_options`.
 - **Write-intent tools are dry-run**: `create_task`, `update_task`, `close_task`, `update_milestone` currently return mock preview payloads.
 - **No approval-execution tools exposed yet**: use write outputs as recommended operations pending future staged execution implementation.
+
+#### Upfront Scoping Pattern (minimize context expansion)
+Collect relevant scope in as few calls as possible before branching into per-milestone workflows:
+1. `get_my_active_opportunities()` — one call returns all active opps with customer names (use `customerKeyword` to narrow).
+2. `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — compact grouped output instead of full records.
+3. Only call `get_milestone_activities(milestoneId)` for specific milestones needing investigation.
+4. Reserve `crm_query` for ad-hoc OData needs not covered by structured tools.
 
 ### WorkIQ MCP companion (M365 retrieval)
 - Use WorkIQ MCP (`ask_work_iq`) when customer-impact evidence lives in M365 collaboration systems.
@@ -175,9 +166,9 @@ When this model is explicit, CSAM friction is treated as upstream ambiguity to c
 **Trigger**: CSAM is tagged as owner for delivery execution delays or unresolved tasks.
 
 **Flow**:
-1. Call `get_milestones(opportunityId)` and identify at-risk/blocked milestones.
+1. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — identify at-risk/blocked milestones from compact output.
 2. Call `crm_query(...)` to inspect owner, assignment, and dependency fields.
-3. Call `get_milestone_activities(milestoneId)` for milestones lacking clear delivery owner evidence.
+3. Call `get_milestone_activities(milestoneId)` for milestones lacking clear delivery owner evidence (targeted only).
 4. Produce dry-run `update_milestone(...)` recommendations to correct owner/dependency clarity.
 
 **Decision logic**:
@@ -192,7 +183,7 @@ When this model is explicit, CSAM friction is treated as upstream ambiguity to c
 **Trigger**: Milestone status is proposed for `committed`.
 
 **Flow**:
-1. Call `get_milestones(opportunityId)` and isolate milestones transitioning to committed.
+1. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — isolate milestones transitioning to committed from compact output.
 2. Call `crm_query(...)` to validate delivery path, capacity signals, and target dates.
 3. For missing readiness evidence, generate dry-run `create_task(...)` and `update_milestone(...)` payloads.
 
@@ -224,7 +215,7 @@ When this model is explicit, CSAM friction is treated as upstream ambiguity to c
 **Trigger**: Unified-dependent milestones are near-term or newly committed.
 
 **Flow**:
-1. Call `get_milestones(opportunityId)` and identify Unified-dependent milestones.
+1. Call `get_milestones({ opportunityId, keyword: 'unified', statusFilter: 'active', format: 'summary' })` — use keyword to isolate Unified-dependent milestones.
 2. Call `crm_query(...)` for eligibility/accreditation/dispatch readiness indicators.
 3. Create dry-run `create_task(...)` escalation or readiness tasks when constraints are missing.
 
@@ -240,7 +231,7 @@ When this model is explicit, CSAM friction is treated as upstream ambiguity to c
 **Trigger**: Expansion signal appears during delivery or adoption execution.
 
 **Flow**:
-1. Call `list_opportunities(accountIds)` and `get_milestones(opportunityId)` for current execution context.
+1. Call `get_my_active_opportunities()` and `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` for current execution context.
 2. Use `crm_query(...)` to identify active expansion motion and owner attribution.
 3. Generate routing guidance and dry-run tasks for CSAM alignment prior to Specialist opportunity creation.
 
@@ -256,7 +247,7 @@ When this model is explicit, CSAM friction is treated as upstream ambiguity to c
 **Trigger**: High alert volume obscures customer-impact execution risks.
 
 **Flow**:
-1. Call `get_milestones(opportunityId)` and `get_milestone_activities(milestoneId)` to map alerts to execution impact.
+1. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` and `get_milestone_activities(milestoneId)` to map alerts to execution impact (targeted milestones only).
 2. Use `crm_query(...)` to classify signals as CSAM-actionable vs reroute candidates.
 3. Generate dry-run `create_task(...)`/`update_task(...)` routing tasks for non-CSAM owners where appropriate.
 
@@ -273,9 +264,9 @@ When this model is explicit, CSAM friction is treated as upstream ambiguity to c
 
 **Flow**:
 1. Call `crm_auth_status`.
-2. Resolve account/opportunity scope (`list_accounts_by_tpid` → `list_opportunities`).
-3. Call `get_milestones(opportunityId)` and isolate committed milestones.
-4. Call `get_milestone_activities(milestoneId)` for each near-term or risk candidate.
+2. Call `get_my_active_opportunities()` — single call replaces `list_accounts_by_tpid` + `list_opportunities`.
+3. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` per opportunity — compact grouped output; isolate committed milestones.
+4. Call `get_milestone_activities(milestoneId)` only for near-term or risk candidates identified in step 3.
 5. Build dry-run changes:
   - `update_milestone(...)` for date/monthly use/comments
   - `create_task(...)` for mitigation actions
@@ -294,8 +285,8 @@ When this model is explicit, CSAM friction is treated as upstream ambiguity to c
 **Trigger**: QBR or success plan refresh.
 
 **Flow**:
-1. Call `list_opportunities(accountIds)` for active scope.
-2. Call `get_milestones(opportunityId)` and map milestones to success outcomes.
+1. Call `get_my_active_opportunities()` for active scope.
+2. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — map milestones to success outcomes from compact output.
 3. Use `crm_query(...)` for additional fields required to validate outcome/metric coverage.
 4. For identified gaps, generate dry-run `update_milestone(...)` and/or `create_task(...)` payloads.
 
@@ -312,7 +303,7 @@ When this model is explicit, CSAM friction is treated as upstream ambiguity to c
 **Flow**:
 1. Build scoped request (customer/opportunity, stakeholders, timeframe, source types).
 2. Call WorkIQ MCP (`ask_work_iq`) to retrieve Teams/meeting/Outlook/SharePoint evidence.
-3. Call `get_milestones(opportunityId)` and `get_milestone_activities(milestoneId)` for execution state.
+3. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` and `get_milestone_activities(milestoneId)` for execution state (targeted milestones only).
 4. Produce a consolidated CSAM-ready pack and dry-run follow-up actions (`create_task(...)`, `update_milestone(...)`) where needed.
 
 **Decision logic**:
@@ -330,8 +321,8 @@ When this model is explicit, CSAM friction is treated as upstream ambiguity to c
 **Trigger**: Adoption milestone created or usage intent increases.
 
 **Flow**:
-1. Call `get_milestones(opportunityId)` to identify usage/adoption milestones.
-2. Call `get_milestone_activities(milestoneId)` to inspect stakeholder coverage.
+1. Call `get_milestones({ opportunityId, keyword: 'adoption', statusFilter: 'active', format: 'summary' })` — use keyword to identify usage/adoption milestones.
+2. Call `get_milestone_activities(milestoneId)` to inspect stakeholder coverage (targeted milestones only).
 3. Call `get_task_status_options()` when status transitions are needed for proposed task updates.
 4. Generate dry-run actions:
   - `create_task(...)` for missing stakeholder tasks

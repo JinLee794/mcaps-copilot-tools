@@ -20,9 +20,56 @@ Use this repository as an MCP-first workflow.
 	- `Specialist` → `.github/skills/Specialist_SKILL.md`
 - If you can infer role from `crm_auth_status`/`crm_whoami` + `crm_get_record`, present the top likely role(s) and ask the user to confirm before proceeding.
 - If role mapping is ambiguous or unknown, do not assume; require explicit user role selection first.
-- For read flows, use MCP tools such as `crm_auth_status`, `crm_whoami`, `crm_query`, `crm_get_record`, `get_milestones`, and `get_milestone_activities`.
 - For write-intent flows, follow role mapping + confirmation gate from `.github/instructions/msx-role-and-write-gate.instructions.md` before any create/update/close operation.
 - Treat local Node scripts as last-resort diagnostics only when MCP tooling is unavailable or explicitly requested by the user.
+
+### CRM Read Query Scoping (Scope-Before-Retrieve)
+
+**Never call `get_milestones` with `mine: true` (or no filters) as the first action.** This returns _all_ milestones for the user and produces massive payloads (500KB+). Always narrow scope before retrieval.
+
+**Step 1 — Clarify intent.** Before any milestone/task/opportunity read, ask clarifying questions to narrow scope:
+- Which opportunity or customer? (name or ID)
+- Which milestone status? (e.g., active, at risk, overdue, completed)
+- What time range? (e.g., this quarter, next 30 days)
+- What information is needed? (e.g., just milestone names, tasks, dates)
+
+**Step 2 — Use composite and batch tools first.** For common multi-customer workflows, prefer composite tools over chaining primitives:
+- `find_milestones_needing_tasks({ customerKeywords: ["Stryker", "Cencora", "BD"] })` — one call replaces the entire accounts→opportunities→milestones→tasks chain.
+- `list_opportunities({ customerKeyword: "Stryker" })` — resolves account names to GUIDs internally, no separate account lookup needed.
+- `get_milestone_activities({ milestoneIds: ["ms1", "ms2", ..."] })` — batch task retrieval grouped by milestone.
+
+**Step 3 — Use `crm_query` for filtered milestone lookups.** This is the preferred tool for milestone queries that need filtering by status, date, or multiple opportunities. See `.github/instructions/crm-entity-schema.instructions.md` for the full entity schema reference.
+- Entity set: `msp_engagementmilestones` (NOT `msp_milestones` or `msp_milestoneses`)
+- Use `$filter` to narrow by status, date range, opportunity, or owner.
+- Use `$select` to return only needed fields (avoid full-record payloads).
+- Use `$top` to limit result count (default to 10–25 unless the user asks for all).
+- Use `$orderby` to sort by date or status for relevance.
+- Multi-opportunity: use OData `or` in `$filter` (e.g., `_msp_opportunityid_value eq '<GUID1>' or _msp_opportunityid_value eq '<GUID2>'`).
+- Status filtering: use `msp_milestonestatus eq 861980000` (On Track), `ne 861980003` (exclude Completed), etc.
+
+**Step 4 — Use `get_milestones` for simple single-entity lookups only:**
+- By `milestoneId` (single record)
+- By `milestoneNumber` (single record)
+- By `opportunityId` (singular — scoped to one opportunity)
+- By `ownerId` (scoped to one owner)
+- `mine: true` only after confirming the user explicitly wants all their milestones and understands the volume.
+- ⚠️ `get_milestones` does NOT support: `opportunityIds` (plural), `statusFilter`, `taskFilter`, or `format`. Use `crm_query` instead for these capabilities.
+
+**Step 5 — Drill down incrementally.** For questions like "which milestones need tasks":
+1. Prefer `find_milestones_needing_tasks` for the full customer→milestone→task chain.
+2. Or use `crm_query` with `entitySet: "msp_engagementmilestones"` and appropriate filters for scoped queries.
+3. Use `get_milestone_activities({ milestoneIds: [...] })` for batch task detail retrieval.
+4. Do not call `get_milestone_activities` one milestone at a time in a loop.
+
+**Examples of good vs bad patterns:**
+- ❌ `get_milestones(mine: true)` → "which ones need attention?"
+- ❌ `get_milestones({ opportunityIds: [...], statusFilter: "active" })` — these params don't exist
+- ❌ `crm_query({ entitySet: "msp_milestones" })` or `"msp_milestoneses"` — wrong entity set name
+- ❌ `crm_query` with `msp_forecastedconsumptionrecurring` in select — field does not exist
+- ❌ Loop: `list_opportunities` per customer → `get_milestones` per opp → `get_milestone_activities` per milestone (~30 calls)
+- ✅ `find_milestones_needing_tasks({ customerKeywords: ["Stryker", "Cencora", "BD"] })` (1 call)
+- ✅ `crm_query({ entitySet: "msp_engagementmilestones", filter: "_msp_opportunityid_value eq '...' and msp_milestonestatus eq 861980000", top: 25 })` (filtered, efficient)
+- ✅ `get_milestone_activities({ milestoneIds: ["ms1", "ms2", "ms3"] })` (1 call instead of 3)
 
 ## WorkIQ Query Scoping
 
@@ -39,12 +86,37 @@ Use this repository as an MCP-first workflow.
 - Keep retrieval context token-efficient by using limit + token budget packing.
 - Promote only validated/stable `fact` or `decision` memories to `durable`; avoid promoting tentative notes.
 - Do not store secrets, tokens, or credentials in agent memory.
+
+### Customer Visit Log
+
+- The file `.agent-memory/working/customer-visit-log.json` tracks customers previously queried in CRM sessions.
+- Before starting a new CRM query workflow, read this file to recall prior context (last customers visited, findings, role).
+- After completing a CRM query workflow, append a new visit entry with: `timestamp`, `role`, `customers`, `intent`, `findings`, and `notes`.
+- Use the `entities` array to quickly look up which customers have been visited before.
+- This enables faster re-engagement: if the user asks about a previously visited customer, reference prior findings instead of re-querying from scratch.
+
+### Memory CLI
+
 - Use local scripts from `mcp-server` for memory operations:
 	- `npm run memory:add -- --scope working --kind fact --summary "..." --content "..."`
 	- `npm run memory:find -- --query "..." --scope working --limit 8 --tokenBudget 1200`
 	- `npm run memory:promote -- --id <memoryId> --fromScope session`
 	- `npm run memory:weekly` (weekly dry-run compaction report)
 	- `npm run memory:weekly:apply` (weekly apply-mode compaction)
+
+## Connect Hooks (Evidence Capture)
+
+When an interaction includes measurable impact or meaningful progress within the three circles of impact
+(individual contribution, team/org outcomes, customer/business value), capture Connect-relevant evidence.
+
+Capture should be:
+- Concrete and attributable (who/what/where).
+- Evidence-based (numbers, outcomes, decisions, recognition).
+- Stored as a durable "hook" in `.connect/hooks/hooks.md` (and optionally `hooks.jsonl`).
+
+Do NOT store speculation. Prefer direct quotes, metrics, and links to PRs/issues/design docs.
+
+See `.github/instructions/connect-hooks.instructions.md` for the full hook schema and formatting rules.
 
 ## Response Expectations
 

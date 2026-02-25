@@ -1,34 +1,18 @@
-# Agent Skill Profile
-
-> **Purpose**: This SKILL.md defines role-specific responsibilities and communication patterns for managing **Microsoft Sales Experience (MSX)** in alignment with the **Microsoft Customer Engagement Methodology (MCEM)**.
->
-> **Audience**: Field roles and copilots/agents supporting those roles.
->
-> **Scope**: Opportunity & milestone management, pipeline hygiene, role-to-role handoffs, and cross-role orchestration.
-
+---
+name: cloud-solution-architect-msx-ops
+description: 'Cloud Solution Architect operating skill for MSX/MCEM. Drives committed milestone execution monitoring, Stage 4-5 value realization, architecture-to-execution handoff, and delivery ownership disambiguation. Use when user identifies as CSA or Cloud Solution Architect, or asks about execution readiness, committed milestone health, value realization packs, architecture handoff notes, or CSA-vs-CSAM authority boundaries.'
+argument-hint: 'Provide opportunity/milestone IDs, execution state, and the outcome needed'
 ---
 
-## Shared definitions (applies to all roles)
+# Cloud Solution Architect (CSA) MSX/MCEM Operations
 
-- **MSX record types**
-  - **Opportunity**: The customer engagement container aligned to MCEM stages and exit criteria.
-  - **Milestone**: The execution unit for commitment, delivery, and usage/consumption outcomes.
-  - **Account / Customer Priority / Plan**: The planning context that informs what the opportunity should achieve.
+## Shared Definitions
+- **Opportunity**: customer engagement container aligned to MCEM stages.
+- **Milestone**: execution unit for commitment, delivery, and usage/consumption outcomes.
+- **Uncommitted**: still shaping; not fully resourced for delivery.
+- **Committed**: customer agreement + internal readiness for execution.
 
-- **Commitment language**
-  - **Uncommitted**: Still shaping; not fully resourced/approved for delivery.
-  - **Committed**: Customer agreement + internal readiness; handoff to execution & value realization.
-
-- **Handoff goals**
-  - Preserve continuity (no “reset” of customer context)
-  - Maintain data integrity (MSX is the system of record)
-  - Make next steps explicit (who does what by when)
-
----
-
-## Role: Cloud Solution Architect (CSA)
-
-### Mission (in MCEM/MSX)
+### Mission (in MCEM/MSX) “reset” ### Mission (in MCEM/MSX)
 Own the **customer technical success path** and ensure committed opportunities are executable, measurable, and progressing to outcomes—using MSX as the system of record.
 
 ### Primary accountabilities by MCEM stage
@@ -140,9 +124,16 @@ Own the **customer technical success path** and ensure committed opportunities a
 ## Agent Skills (declarative MCP flows)
 
 ### Runtime contract (current server behavior)
-- **Read tools are live**: `crm_auth_status`, `crm_whoami`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `crm_get_record`, `crm_query`, `get_task_status_options`.
+- **Read tools are live**: `crm_auth_status`, `crm_whoami`, `get_my_active_opportunities`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `crm_get_record`, `crm_query`, `get_task_status_options`.
 - **Write-intent tools are dry-run**: `create_task`, `update_task`, `close_task`, `update_milestone` return preview payloads (`mock: true`).
 - **Staged execution pattern is documented but not exposed as tools yet**: treat write outputs as approval-ready recommendations.
+
+#### Upfront Scoping Pattern (minimize context expansion)
+Collect relevant scope in as few calls as possible before branching into per-milestone workflows:
+1. `get_my_active_opportunities()` — one call returns all active opps with customer names (use `customerKeyword` to narrow).
+2. `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — compact grouped output instead of full records.
+3. Only call `get_milestone_activities(milestoneId)` for specific milestones needing investigation.
+4. Reserve `crm_query` for ad-hoc OData needs not covered by structured tools.
 
 ### WorkIQ MCP companion (M365 retrieval)
 - Use WorkIQ MCP (`ask_work_iq`) for collaboration evidence that is not modeled in CRM entities.
@@ -156,11 +147,9 @@ Own the **customer technical success path** and ensure committed opportunities a
 
 **Flow**:
 1. Call `crm_auth_status`.
-2. Resolve account/opportunity scope:
-  - `list_accounts_by_tpid(tpids)` when starting from TPID.
-  - `list_opportunities(accountIds)` to enumerate open opportunities.
-3. Call `get_milestones(opportunityId)` and filter committed milestones.
-4. Call `get_milestone_activities(milestoneId)` for each at-risk/blocked candidate.
+2. Call `get_my_active_opportunities()` — single call replaces `list_accounts_by_tpid` + `list_opportunities`.
+3. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` per opportunity — returns compact grouped output; filter committed milestones from summary.
+4. Call `get_milestone_activities(milestoneId)` only for at-risk/blocked candidates identified in step 3.
 5. Generate dry-run corrective updates with `update_milestone(...)` and follow-up tasks via `create_task(...)`.
 
 **Decision logic**:
@@ -177,8 +166,8 @@ Own the **customer technical success path** and ensure committed opportunities a
 
 **Flow**:
 1. Call `crm_get_record(entitySet='opportunities', id=opportunityId, select=...)`.
-2. Call `get_milestones(opportunityId)` and isolate value/adoption milestones.
-3. Call `get_milestone_activities(milestoneId)` to verify execution cadence.
+2. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — isolate value/adoption milestones from compact output.
+3. Call `get_milestone_activities(milestoneId)` only for milestones lacking execution cadence evidence.
 4. If outcomes are under-specified, call `update_milestone(...)` (dry-run) for measurable comments/use updates.
 5. If orchestration actions are missing, call `create_task(...)` (dry-run) for CSAM/CSU actions.
 
@@ -196,8 +185,8 @@ Own the **customer technical success path** and ensure committed opportunities a
 **Trigger**: Proof complete or commitment flips uncommitted → committed.
 
 **Flow**:
-1. Call `get_milestones(opportunityId)` to identify impacted milestones.
-2. Call `get_milestone_activities(milestoneId)` for proof traces.
+1. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` to identify impacted milestones.
+2. Call `get_milestone_activities(milestoneId)` for proof traces (targeted milestones only).
 3. Call `crm_query(entitySet='tasks', filter=..., select=...)` if broader dependency tracking is required.
 4. Draft handoff with explicit asks; include dry-run `create_task(...)` payloads for missing owners/actions.
 
@@ -216,7 +205,7 @@ Own the **customer technical success path** and ensure committed opportunities a
 **Trigger**: CSA listed as milestone owner while delivery motion indicates Partner/ISD/Unified ownership.
 
 **Flow**:
-1. Call `get_milestones(opportunityId)` and collect owner + delivery motion fields.
+1. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — collect owner + delivery motion fields from compact output.
 2. Call `crm_query(entitySet='tasks', filter=..., select=...)` for ownership/coordination tasks.
 3. Identify owner-motion mismatches and impacted due dates.
 4. Produce dry-run `update_milestone(...)` recommendations for ownership clarification comments/risk notes.
@@ -236,8 +225,8 @@ Own the **customer technical success path** and ensure committed opportunities a
 
 **Flow**:
 1. Call `crm_get_record(entitySet='opportunities', id=opportunityId, select=...)`.
-2. Call `get_milestones(opportunityId)` for commitment-bound milestones.
-3. Call `get_milestone_activities(milestoneId)` for execution evidence.
+2. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` for commitment-bound milestones.
+3. Call `get_milestone_activities(milestoneId)` for execution evidence (targeted milestones only).
 4. Validate required readiness metadata: delivery motion, environment prerequisites, and success metrics.
 5. Generate dry-run `update_milestone(...)` and `create_task(...)` gap-closure actions.
 
@@ -254,8 +243,8 @@ Own the **customer technical success path** and ensure committed opportunities a
 **Trigger**: Milestones include Unified-dependent execution paths.
 
 **Flow**:
-1. Call `get_milestones(opportunityId)` and isolate Unified-related milestones.
-2. Call `get_milestone_activities(milestoneId)` to detect eligibility/accreditation/dispatch evidence.
+1. Call `get_milestones({ opportunityId, keyword: 'unified', statusFilter: 'active', format: 'summary' })` — use keyword to isolate Unified-related milestones.
+2. Call `get_milestone_activities(milestoneId)` to detect eligibility/accreditation/dispatch evidence (targeted milestones only).
 3. If missing, draft dry-run `update_milestone(...)` risk/status updates.
 4. Draft dry-run `create_task(...)` actions for CSAM and Specialist escalation/coordination.
 
@@ -272,8 +261,8 @@ Own the **customer technical success path** and ensure committed opportunities a
 **Trigger**: CSA receives milestone alerts with mixed technical and administrative actions.
 
 **Flow**:
-1. Call `get_milestones(opportunityId)` for affected milestones.
-2. Call `get_milestone_activities(milestoneId)` for supporting evidence.
+1. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` for affected milestones.
+2. Call `get_milestone_activities(milestoneId)` for supporting evidence (targeted milestones only).
 3. Classify each alert/action as technical_truth_required or admin_reroute.
 4. Draft dry-run `update_milestone(...)` only for technical-truth changes.
 5. Draft dry-run `create_task(...)` rerouting actions for ownership/admin corrections.
@@ -292,7 +281,7 @@ Own the **customer technical success path** and ensure committed opportunities a
 **Flow**:
 1. Build scoped query (customer/opportunity, people, timeframe, source types).
 2. Call WorkIQ MCP (`ask_work_iq`) to retrieve relevant Teams/meeting/Outlook/SharePoint evidence.
-3. Call `get_milestones(opportunityId)` and `get_milestone_activities(milestoneId)`.
+3. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` and `get_milestone_activities(milestoneId)` (targeted only).
 4. Compare M365 evidence with CRM status and draft dry-run gap closures via `update_milestone(...)` and `create_task(...)`.
 
 **Output schema**:
@@ -305,7 +294,7 @@ Own the **customer technical success path** and ensure committed opportunities a
 **Trigger**: Execution issue is escalated to CSA and routing is unclear.
 
 **Flow**:
-1. Call `get_milestones(opportunityId)` and `get_milestone_activities(milestoneId)` for context.
+1. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` and `get_milestone_activities(milestoneId)` for context (targeted milestones only).
 2. Optionally call `crm_query(entitySet='tasks', filter=..., select=...)` for open actions.
 3. Classify issue as technical | delivery | commercial.
 4. Draft dry-run task routing with `create_task(...)` to correct owner role.
@@ -324,8 +313,8 @@ Own the **customer technical success path** and ensure committed opportunities a
 **Trigger**: Stage 5 optimization insights may imply expansion opportunities.
 
 **Flow**:
-1. Call `get_milestones(opportunityId)` and isolate optimize/adoption outcomes.
-2. Call `get_milestone_activities(milestoneId)` for evidence of unmet potential or extension patterns.
+1. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — isolate optimize/adoption outcomes from compact output.
+2. Call `get_milestone_activities(milestoneId)` for evidence of unmet potential or extension patterns (targeted milestones only).
 3. Draft dry-run `create_task(...)` to route expansion signal to Specialist/ATU owner.
 4. Draft dry-run `update_milestone(...)` comments to preserve signal context in MSX.
 
