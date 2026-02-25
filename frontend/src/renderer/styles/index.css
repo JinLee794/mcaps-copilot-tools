@@ -58,6 +58,7 @@ body {
   border-bottom: 1px solid var(--border-color);
   -webkit-app-region: drag;
   user-select: none;
+  position: relative;
 }
 
 .header-left {
@@ -75,6 +76,10 @@ body {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .header-right {
@@ -577,6 +582,19 @@ body {
   border-radius: 4px;
   font-size: 12px;
   cursor: pointer;
+}
+
+.approval-args-editor {
+  width: 100%;
+  padding: 8px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  resize: vertical;
+  box-sizing: border-box;
 }
 
 .btn-approve {

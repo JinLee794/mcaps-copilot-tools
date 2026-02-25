@@ -1,5 +1,5 @@
 // Skills Panel — skill list, tuner, run button, workflow registry (§5.1, §13.8)
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useSkillLoader } from '../hooks/useSkillLoader';
 import { SkillEditor } from '../components/SkillEditor';
 import type { WorkflowRegistryEntry } from '../../shared/types/CapturedWorkflow';
@@ -21,7 +21,7 @@ export function SkillsPanel({ onOpenMcpInspector }: SkillsPanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>('skills');
   const [editingSkill, setEditingSkill] = useState<{ id: string; content: string } | null>(null);
   const [runMode, setRunMode] = useState<'explore' | 'workflow'>('explore');
-  const [workflows] = useState<WorkflowRegistryEntry[]>([]); // Populated from .copilot/workflows/
+  const [workflows, setWorkflows] = useState<WorkflowRegistryEntry[]>([]);
   const [tunerParams, setTunerParams] = useState({
     accountContext: '',
     timeWindow: '30d',
@@ -29,6 +29,14 @@ export function SkillsPanel({ onOpenMcpInspector }: SkillsPanelProps) {
     outputFormat: 'Exec Summary',
   });
   const [prompt, setPrompt] = useState('');
+
+  // Load workflows from IPC on mount
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    window.electronAPI.workflows.list().then((result) => {
+      setWorkflows(result.workflows as WorkflowRegistryEntry[]);
+    }).catch(() => { /* workflows dir may not exist yet */ });
+  }, []);
 
   const handleRun = useCallback(() => {
     if (!activeSkill) return;

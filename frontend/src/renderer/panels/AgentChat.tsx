@@ -21,10 +21,33 @@ interface ChatMessage {
 export function AgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { state } = useAgentState();
-  const { toolCalls, interrupt } = useAgUiEvents();
+  const { toolCalls, interrupt, streamingText } = useAgUiEvents();
+
+  // Append or update the assistant message as streaming text arrives
+  useEffect(() => {
+    if (!streamingText) return;
+    setMessages((prev) => {
+      const lastMsg = prev[prev.length - 1];
+      if (lastMsg?.role === 'assistant' && lastMsg.id.startsWith('assistant-stream-')) {
+        // Update existing streaming message
+        return prev.map((m) =>
+          m.id === lastMsg.id ? { ...m, content: streamingText } : m,
+        );
+      }
+      // Start new assistant message
+      return [
+        ...prev,
+        {
+          id: `assistant-stream-${Date.now()}`,
+          role: 'assistant' as const,
+          content: streamingText,
+          timestamp: new Date(),
+        },
+      ];
+    });
+  }, [streamingText]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -63,9 +86,9 @@ export function AgentChat() {
     [handleSend],
   );
 
-  const handleApprove = useCallback(async () => {
+  const handleApprove = useCallback(async (editedArgs?: Record<string, unknown>) => {
     if (window.electronAPI) {
-      await window.electronAPI.permission.respond({ approved: true });
+      await window.electronAPI.permission.respond({ approved: true, edits: editedArgs });
     }
   }, []);
 

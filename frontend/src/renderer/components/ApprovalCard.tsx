@@ -1,5 +1,5 @@
 // ApprovalCard — HITL confirmation gate before write operations (§6.3)
-import React from 'react';
+import React, { useState } from 'react';
 
 interface DiffRow {
   field: string;
@@ -12,7 +12,7 @@ interface ApprovalCardProps {
   toolName: string;
   proposedArgs?: Record<string, unknown>;
   diffPreview?: DiffRow[];
-  onApprove: () => void;
+  onApprove: (editedArgs?: Record<string, unknown>) => void;
   onSkip: () => void;
 }
 
@@ -24,6 +24,22 @@ export function ApprovalCard({
   onApprove,
   onSkip,
 }: ApprovalCardProps) {
+  const [editing, setEditing] = useState(false);
+  const [editedJson, setEditedJson] = useState(() =>
+    proposedArgs ? JSON.stringify(proposedArgs, null, 2) : '',
+  );
+  const [parseError, setParseError] = useState<string | null>(null);
+
+  const handleEditApprove = () => {
+    try {
+      const parsed = JSON.parse(editedJson) as Record<string, unknown>;
+      setParseError(null);
+      onApprove(parsed);
+    } catch {
+      setParseError('Invalid JSON');
+    }
+  };
+
   return (
     <div className="approval-card">
       <div className="approval-header">
@@ -37,7 +53,7 @@ export function ApprovalCard({
         </div>
 
         {/* Diff preview table */}
-        {diffPreview && diffPreview.length > 0 && (
+        {diffPreview && diffPreview.length > 0 && !editing && (
           <table className="approval-diff-table">
             <thead>
               <tr>
@@ -58,15 +74,42 @@ export function ApprovalCard({
           </table>
         )}
 
-        {/* Proposed args (fallback when no diff) */}
-        {!diffPreview && proposedArgs && (
-          <pre className="approval-args">{JSON.stringify(proposedArgs, null, 2)}</pre>
+        {/* Proposed args (fallback when no diff, or when editing) */}
+        {editing ? (
+          <div>
+            <textarea
+              className="approval-args-editor"
+              value={editedJson}
+              onChange={(e) => { setEditedJson(e.target.value); setParseError(null); }}
+              rows={8}
+              spellCheck={false}
+            />
+            {parseError && (
+              <div style={{ color: 'var(--accent-red)', fontSize: 11, marginTop: 4 }}>
+                {parseError}
+              </div>
+            )}
+          </div>
+        ) : (
+          !diffPreview && proposedArgs && (
+            <pre className="approval-args">{JSON.stringify(proposedArgs, null, 2)}</pre>
+          )
         )}
       </div>
       <div className="approval-actions">
-        <button className="btn-primary" onClick={onApprove}>
-          ✓ Approve
+        <button className="btn-primary" onClick={() => editing ? handleEditApprove() : onApprove()}>
+          ✓ {editing ? 'Save & Approve' : 'Approve'}
         </button>
+        {proposedArgs && !editing && (
+          <button className="btn-secondary" onClick={() => setEditing(true)}>
+            ✎ Edit
+          </button>
+        )}
+        {editing && (
+          <button className="btn-secondary" onClick={() => { setEditing(false); setParseError(null); }}>
+            Cancel Edit
+          </button>
+        )}
         <button className="btn-secondary" onClick={onSkip}>
           ✕ Skip
         </button>

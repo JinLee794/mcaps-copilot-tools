@@ -4,10 +4,10 @@ import { SkillsPanel } from './panels/SkillsPanel';
 import { ResearchCanvas } from './panels/ResearchCanvas';
 import { AgentChat } from './panels/AgentChat';
 import { McpInspector } from './panels/McpInspector';
-import { useAgUiTransport } from './hooks/useAgUiTransport';
+import { AgUiTransportProvider, useAgUiTransport } from './hooks/useAgUiTransport';
 import './styles/index.css';
 
-export default function App() {
+function AppShell() {
   const [showMcpInspector, setShowMcpInspector] = React.useState(false);
   const transport = useAgUiTransport();
 
@@ -58,5 +58,13 @@ export default function App() {
           <McpInspector onClose={() => setShowMcpInspector(false)} />
         )}
       </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AgUiTransportProvider>
+      <AppShell />
+    </AgUiTransportProvider>
   );
 }

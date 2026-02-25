@@ -1,5 +1,6 @@
-// useAgUiTransport — listens for AG-UI events from main process, maintains agent state
-import { useState, useEffect, useCallback, useRef } from 'react';
+// useAgUiTransport — listens for AG-UI events from main process, maintains agent state.
+// Uses React Context so all panels share a single subscription + state.
+import React, { useState, useEffect, useContext, createContext } from 'react';
 import type { AgUiEvent, AgUiEventType } from '../../shared/types/AgUiEvent';
 import type { SalesAgentState } from '../../shared/types/SalesAgentState';
 import { createInitialState } from '../../shared/types/SalesAgentState';
@@ -11,22 +12,33 @@ declare global {
   }
 }
 
-interface InterruptState {
+export interface InterruptState {
   message: string;
   toolName: string;
   proposedArgs?: Record<string, unknown>;
   diffPreview?: Array<{ field: string; before: string; after: string }>;
 }
 
+interface AgUiTransportValue {
+  state: SalesAgentState;
+  toolCalls: ToolCallEntry[];
+  interrupt: InterruptState | null;
+  connected: boolean;
+  /** Accumulated assistant text from TEXT_MESSAGE_CONTENT events (for AgentChat) */
+  streamingText: string;
+}
+
+const AgUiTransportContext = createContext<AgUiTransportValue | null>(null);
+
 /**
- * Core hook: subscribes to AG-UI events via IPC and maintains the SalesAgentState.
- * Returns the full transport handle used by the CopilotKit provider.
+ * Provider: wraps the app to create a single IPC subscription shared by all panels.
  */
-export function useAgUiTransport() {
+export function AgUiTransportProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<SalesAgentState>(createInitialState());
   const [toolCalls, setToolCalls] = useState<ToolCallEntry[]>([]);
   const [interrupt, setInterrupt] = useState<InterruptState | null>(null);
   const [connected, setConnected] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
 
   useEffect(() => {
     if (!window.electronAPI) return;
@@ -39,6 +51,7 @@ export function useAgUiTransport() {
           setToolCalls([]);
           setInterrupt(null);
           setConnected(true);
+          setStreamingText('');
           break;
 
         case 'RUN_FINISHED':
@@ -46,10 +59,7 @@ export function useAgUiTransport() {
           break;
 
         case 'RUN_ERROR':
-          setState((prev) => ({
-            ...prev,
-            status: 'error',
-          }));
+          setState((prev) => ({ ...prev, status: 'error' }));
           break;
 
         case 'TEXT_MESSAGE_START':
@@ -57,17 +67,21 @@ export function useAgUiTransport() {
             ...prev,
             output: { ...prev.output, status: 'streaming' },
           }));
+          setStreamingText('');
           break;
 
-        case 'TEXT_MESSAGE_CONTENT':
+        case 'TEXT_MESSAGE_CONTENT': {
+          const delta = String(d['delta'] ?? '');
           setState((prev) => ({
             ...prev,
             output: {
               ...prev.output,
-              markdown: prev.output.markdown + (String(d['delta'] ?? '')),
+              markdown: prev.output.markdown + delta,
             },
           }));
+          setStreamingText((prev) => prev + delta);
           break;
+        }
 
         case 'TEXT_MESSAGE_END':
           setState((prev) => ({
@@ -100,21 +114,18 @@ export function useAgUiTransport() {
           break;
         }
 
-        case 'STATE_DELTA': {
+        case 'STATE_DELTA':
           setState((prev) => ({ ...prev, ...d as Partial<SalesAgentState> }));
           break;
-        }
 
-        case 'STATE_SNAPSHOT': {
+        case 'STATE_SNAPSHOT':
           setState(d as unknown as SalesAgentState);
           break;
-        }
 
-        case 'INTERRUPT': {
+        case 'INTERRUPT':
           setInterrupt(d as unknown as InterruptState);
           setState((prev) => ({ ...prev, status: 'paused' }));
           break;
-        }
 
         default:
           break;
@@ -124,21 +135,30 @@ export function useAgUiTransport() {
     return cleanup;
   }, []);
 
-  return { state, toolCalls, interrupt, connected };
+  const value: AgUiTransportValue = { state, toolCalls, interrupt, connected, streamingText };
+
+  return React.createElement(AgUiTransportContext.Provider, { value }, children);
 }
 
-/**
- * Convenience hook: just the agent state (used by ResearchCanvas, AgentChat).
- */
+function useTransportContext(): AgUiTransportValue {
+  const ctx = useContext(AgUiTransportContext);
+  if (!ctx) throw new Error('useAgUiTransport must be used inside <AgUiTransportProvider>');
+  return ctx;
+}
+
+/** Full transport state — used by App for status bar / header. */
+export function useAgUiTransport() {
+  return useTransportContext();
+}
+
+/** Just the agent state — used by ResearchCanvas. */
 export function useAgentState() {
-  const { state } = useAgUiTransport();
+  const { state } = useTransportContext();
   return { state };
 }
 
-/**
- * Convenience hook: tool call log + interrupt state (used by AgentChat).
- */
+/** Tool calls, interrupt, and streaming text — used by AgentChat. */
 export function useAgUiEvents() {
-  const { toolCalls, interrupt } = useAgUiTransport();
-  return { toolCalls, interrupt };
+  const { toolCalls, interrupt, streamingText } = useTransportContext();
+  return { toolCalls, interrupt, streamingText };
 }
