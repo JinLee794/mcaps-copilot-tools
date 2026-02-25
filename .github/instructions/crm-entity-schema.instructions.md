@@ -90,6 +90,7 @@ Incorrect entity set names or field names will return 404 or 400 errors.
 |-------|-------|-------|
 | `msp_forecastedconsumptionrecurring` | 400 — not a valid property | Does not exist on `msp_engagementmilestone` |
 | `msp_committedconsumptionrecurring` | 400 — not a valid property | Does not exist on `msp_engagementmilestone` |
+| `msp_estimatedcompletiondate` | 400 — not a valid property | Does not exist on `msp_engagementmilestone`; use `msp_milestonedate` instead |
 
 ## Common Mistakes to Avoid
 - ❌ `msp_accounttpid` → ✅ `msp_mstopparentid` (TPID on accounts)
@@ -98,6 +99,7 @@ Incorrect entity set names or field names will return 404 or 400 errors.
 - ❌ `opportunityid` in milestone filter → ✅ `_msp_opportunityid_value`
 - ❌ `taskid` → ✅ `activityid` (tasks use activity primary key)
 - ❌ `msp_engagementmilestone` as entity set → ✅ `msp_engagementmilestones` (plural)
+- ❌ `msp_estimatedcompletiondate` on milestone → ✅ `msp_milestonedate` (correct date field)
 
 ## Milestone Status Codes
 

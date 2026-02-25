@@ -83,6 +83,7 @@ Use this repository as an MCP-first workflow.
 - ❌ `get_milestones({ opportunityIds: [...], statusFilter: "active" })` — these params don't exist
 - ❌ `crm_query({ entitySet: "msp_milestones" })` or `"msp_milestoneses"` — wrong entity set name
 - ❌ `crm_query` with `msp_forecastedconsumptionrecurring` in select — field does not exist
+- ❌ `crm_query` with `msp_estimatedcompletiondate` in select/filter — field does not exist on milestone; use `msp_milestonedate`
 - ❌ Loop: `list_opportunities` per customer → `get_milestones` per opp → `get_milestone_activities` per milestone (~30 calls)
 - ✅ `find_milestones_needing_tasks({ customerKeywords: ["Stryker", "Cencora", "BD"] })` (1 call)
 - ✅ `crm_query({ entitySet: "msp_engagementmilestones", filter: "_msp_opportunityid_value eq '...' and msp_milestonestatus eq 861980000", top: 25 })` (filtered, efficient)
@@ -94,23 +95,25 @@ Use this repository as an MCP-first workflow.
 - Use `.github/skills/WorkIQ_Query_Scoping_SKILL.md` as the canonical execution playbook for fact mapping, clarifying questions, defaults, two-pass retrieval, and sensitivity boundaries.
 - If role mapping and WorkIQ scoping both apply, resolve role first, then apply WorkIQ scoping before retrieval.
 
-## Local Agent Memory Retrieval
+## Knowledge Layers (Vault + Agent Memory)
 
-- Use local structured memory at `.agent-memory/` for context recall when relevant to the user request.
-- Retrieve in this order: `session` → `working` → `durable`.
-- Apply hard filters before ranking when available (`scope`, `kind`, `tags`, `entities`).
-- Prefer lexical retrieval first; only use semantic fallback if lexical results are weak.
-- Keep retrieval context token-efficient by using limit + token budget packing.
-- Promote only validated/stable `fact` or `decision` memories to `durable`; avoid promoting tentative notes.
+The agent operates with two knowledge layers. The Obsidian vault is the **primary** local knowledge store; `.agent-memory/` handles transient session/working state.
+
+### Obsidian Vault (Primary — `mcp-obsidian`)
+
+- The vault defines the **active customer roster** — only customers with `Customers/<Name>.md` files are in scope for proactive workflows.
+- **Before CRM queries**: read vault customer files for context (team, opportunities, prior findings) to scope queries. Don't query CRM blind when the vault tells you who matters.
+- **After CRM workflows**: promote validated findings to the vault (`## Agent Insights` on the customer file).
+- **Vault scopes, CRM validates**: use vault for *who/what/why* context; use CRM for *current state* data. Never substitute cached vault data for live CRM status on complex operations (writes, risk assessment, governance).
+- See `.github/instructions/obsidian-vault.instructions.md` for full conventions, freshness rules, and workflow integration.
+
+### Agent Memory (Session + Working — `.agent-memory/`)
+
+- Use `.agent-memory/session/` and `.agent-memory/working/` for transient context within and across sessions.
+- Retrieve in order: `session` → `working`. Durable promotion goes to the vault when available.
+- `.agent-memory/working/customer-visit-log.json` tracks recent CRM sessions; read before new queries, append after.
+- If the vault is unavailable, `.agent-memory/durable/` serves as fallback durable storage.
 - Do not store secrets, tokens, or credentials in agent memory.
-
-### Customer Visit Log
-
-- The file `.agent-memory/working/customer-visit-log.json` tracks customers previously queried in CRM sessions.
-- Before starting a new CRM query workflow, read this file to recall prior context (last customers visited, findings, role).
-- After completing a CRM query workflow, append a new visit entry with: `timestamp`, `role`, `customers`, `intent`, `findings`, and `notes`.
-- Use the `entities` array to quickly look up which customers have been visited before.
-- This enables faster re-engagement: if the user asks about a previously visited customer, reference prior findings instead of re-querying from scratch.
 
 ### Memory CLI
 
@@ -129,11 +132,10 @@ When an interaction includes measurable impact or meaningful progress within the
 Capture should be:
 - Concrete and attributable (who/what/where).
 - Evidence-based (numbers, outcomes, decisions, recognition).
-- Stored as a durable "hook" in `.connect/hooks/hooks.md` (and optionally `hooks.jsonl`).
 
-Do NOT store speculation. Prefer direct quotes, metrics, and links to PRs/issues/design docs.
+Storage routing follows the vault-first pattern: append to the customer's vault file under `## Connect Hooks`, with `.connect/hooks/hooks.md` as local backup. Do NOT store speculation.
 
-See `.github/instructions/connect-hooks.instructions.md` for the full hook schema and formatting rules.
+See `.github/instructions/connect-hooks.instructions.md` for hook schema and `.github/instructions/obsidian-vault.instructions.md` for vault routing conventions.
 
 ## Response Expectations
 

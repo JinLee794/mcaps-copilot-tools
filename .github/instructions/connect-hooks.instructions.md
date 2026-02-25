@@ -1,6 +1,6 @@
 ---
 applyTo: ".connect/hooks/**"
-description: "Connect hook formatting + evidence schema"
+description: "Connect hook formatting + evidence schema, Obsidian vault routing for Connect evidence capture"
 ---
 # Connect Hook Writing Guide
 
@@ -10,6 +10,15 @@ When writing Connect hooks:
 - Each hook must map to at least one of the **3 circles of impact**.
 - Include concrete evidence and a source pointer (PR / Issue / Doc / Thread).
 - Keep each hook to **3–6 lines**.
+
+## Storage Routing
+
+Connect hooks follow the vault-first storage pattern defined in `.github/instructions/obsidian-vault.instructions.md`.
+
+**Summary:**
+1. **Vault available**: Append to `Customers/<CustomerName>.md` under `## Connect Hooks` (use `patch_note` with `operation: "append"` and `heading: "Connect Hooks"`). Create the file/section if it doesn't exist.
+2. **Always**: Write to `.connect/hooks/hooks.md` as a repo-tracked backup, regardless of vault availability.
+3. **Vault unavailable**: `.connect/hooks/hooks.md` is the sole destination.
 
 ## Schema
 
