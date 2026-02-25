@@ -54,6 +54,54 @@ function toIsoDate(value) {
   return date.toISOString().slice(0, 10);
 }
 
+function fv(record, field) {
+  return record[`${field}@OData.Community.Display.V1.FormattedValue`] ?? null;
+}
+
+const ACTIVE_STATUSES = new Set(['Not Started', 'In Progress', 'Blocked', 'At Risk']);
+
+function buildMilestoneSummary(milestones) {
+  const byStatus = {};
+  const byOpportunity = {};
+  for (const m of milestones) {
+    const status = fv(m, 'msp_milestonestatus') || 'Unknown';
+    byStatus[status] = (byStatus[status] || 0) + 1;
+    const opp = fv(m, '_msp_opportunityid_value') || 'Unknown';
+    byOpportunity[opp] = (byOpportunity[opp] || 0) + 1;
+  }
+  return {
+    count: milestones.length,
+    byStatus,
+    byOpportunity,
+    milestones: milestones.map(m => ({
+      ...m,
+      status: fv(m, 'msp_milestonestatus'),
+      opportunity: fv(m, '_msp_opportunityid_value')
+    }))
+  };
+}
+
+async function applyTaskFilter(crmClient, milestones, mode) {
+  if (!milestones.length) return milestones;
+  const msIds = milestones.map(m => m.msp_engagementmilestoneid).filter(Boolean);
+  const chunks = [];
+  for (let i = 0; i < msIds.length; i += 25) chunks.push(msIds.slice(i, i + 25));
+  const taskMatches = new Set();
+  for (const chunk of chunks) {
+    const tf = chunk.map(id => `_regardingobjectid_value eq '${id}'`).join(' or ');
+    const taskResult = await crmClient.requestAllPages('tasks', {
+      query: { $filter: tf, $select: '_regardingobjectid_value' }
+    });
+    if (taskResult.ok && taskResult.data?.value) {
+      for (const t of taskResult.data.value) taskMatches.add(t._regardingobjectid_value);
+    }
+  }
+  if (mode === 'without-tasks') {
+    return milestones.filter(m => !taskMatches.has(m.msp_engagementmilestoneid));
+  }
+  return milestones.filter(m => taskMatches.has(m.msp_engagementmilestoneid));
+}
+
 /**
  * Register all CRM tools on an McpServer instance.
  */
@@ -123,18 +171,32 @@ export function registerTools(server, crmClient) {
   // ── list_opportunities ──────────────────────────────────────
   server.tool(
     'list_opportunities',
-    'List open opportunities for one or more account IDs. Returns opportunity name, dates, owner, solution play.',
+    'List open opportunities for one or more account IDs or by customer name keyword. Returns opportunity name, dates, owner, solution play.',
     {
-      accountIds: z.array(z.string()).describe('Array of Dynamics 365 account GUIDs')
+      accountIds: z.array(z.string()).optional().describe('Array of Dynamics 365 account GUIDs'),
+      customerKeyword: z.string().optional().describe('Customer name keyword — resolves matching accounts internally')
     },
-    async ({ accountIds }) => {
-      if (!accountIds?.length) return error('At least one accountId is required');
-      const validIds = accountIds.map(normalizeGuid).filter(isValidGuid);
-      if (!validIds.length) return error('No valid account GUIDs provided');
+    async ({ accountIds, customerKeyword }) => {
+      let resolvedIds = accountIds ? accountIds.map(normalizeGuid).filter(isValidGuid) : [];
+
+      // Resolve customerKeyword → account GUIDs
+      if (!resolvedIds.length && customerKeyword) {
+        const sanitized = sanitizeODataString(customerKeyword.trim());
+        const acctResult = await crmClient.requestAllPages('accounts', {
+          query: { $filter: `contains(name,'${sanitized}')`, $select: 'accountid,name', $top: '50' }
+        });
+        const matchedAccounts = acctResult.ok ? (acctResult.data?.value || []) : [];
+        if (!matchedAccounts.length) {
+          return text({ count: 0, opportunities: [], matchedAccounts: [], message: `No accounts found matching '${customerKeyword}'` });
+        }
+        resolvedIds = matchedAccounts.map(a => a.accountid);
+      }
+
+      if (!resolvedIds.length) return error('Provide accountIds array or customerKeyword');
 
       // Chunk into groups of 25 to keep filter URL manageable
       const chunks = [];
-      for (let i = 0; i < validIds.length; i += 25) chunks.push(validIds.slice(i, i + 25));
+      for (let i = 0; i < resolvedIds.length; i += 25) chunks.push(resolvedIds.slice(i, i + 25));
 
       const allOpps = [];
       for (const chunk of chunks) {
@@ -152,15 +214,20 @@ export function registerTools(server, crmClient) {
   // ── get_milestones ──────────────────────────────────────────
   server.tool(
     'get_milestones',
-    'Get engagement milestones by milestoneId, milestone number, opportunity, or owner. Defaults to current user milestones when no filters are provided.',
+    'Get engagement milestones by milestoneId, milestone number, opportunity, or owner. Supports batch opportunityIds, status/keyword filtering, and task-presence filtering.',
     {
       opportunityId: z.string().optional().describe('Opportunity GUID to list milestones for'),
+      opportunityIds: z.array(z.string()).optional().describe('Array of opportunity GUIDs for batch milestone retrieval'),
       milestoneNumber: z.string().optional().describe('Milestone number to search for, e.g. "7-123456789"'),
       milestoneId: z.string().optional().describe('Direct milestone GUID lookup'),
       ownerId: z.string().optional().describe('Owner system user GUID to list milestones for'),
-      mine: z.boolean().optional().describe('When true (default), returns milestones owned by the authenticated CRM user if no other filter is provided')
+      mine: z.boolean().optional().describe('When true (default), returns milestones owned by the authenticated CRM user if no other filter is provided'),
+      statusFilter: z.enum(['active', 'all']).optional().describe('Filter by status: active = Not Started/In Progress/Blocked/At Risk'),
+      keyword: z.string().optional().describe('Case-insensitive keyword filter across milestone name, opportunity, and workload'),
+      format: z.enum(['full', 'summary']).optional().describe('Response format: full (default) or summary (grouped compact output)'),
+      taskFilter: z.enum(['all', 'with-tasks', 'without-tasks']).optional().describe('Filter milestones by task presence')
     },
-    async ({ opportunityId, milestoneNumber, milestoneId, ownerId, mine }) => {
+    async ({ opportunityId, opportunityIds, milestoneNumber, milestoneId, ownerId, mine, statusFilter, keyword, format, taskFilter: taskFilterParam }) => {
       // Direct GUID lookup
       if (milestoneId) {
         const nid = normalizeGuid(milestoneId);
@@ -176,6 +243,36 @@ export function registerTools(server, crmClient) {
       if (milestoneNumber) {
         const sanitized = sanitizeODataString(milestoneNumber.trim());
         filter = `msp_milestonenumber eq '${sanitized}'`;
+      } else if (opportunityIds?.length) {
+        const validIds = opportunityIds.map(normalizeGuid).filter(isValidGuid);
+        if (!validIds.length) return error('No valid opportunity GUIDs in opportunityIds');
+        const chunks = [];
+        for (let i = 0; i < validIds.length; i += 25) chunks.push(validIds.slice(i, i + 25));
+        const allMilestones = [];
+        for (const chunk of chunks) {
+          const chunkFilter = chunk.map(id => `_msp_opportunityid_value eq '${id}'`).join(' or ');
+          const chunkResult = await crmClient.requestAllPages('msp_engagementmilestones', {
+            query: { $filter: chunkFilter, $select: MILESTONE_SELECT, $orderby: 'msp_milestonedate' }
+          });
+          if (chunkResult.ok && chunkResult.data?.value) allMilestones.push(...chunkResult.data.value);
+        }
+        let milestones = allMilestones;
+        if (statusFilter === 'active') {
+          milestones = milestones.filter(m => ACTIVE_STATUSES.has(fv(m, 'msp_milestonestatus')));
+        }
+        if (keyword) {
+          const kw = keyword.toLowerCase();
+          milestones = milestones.filter(m =>
+            (m.msp_name || '').toLowerCase().includes(kw) ||
+            (fv(m, '_msp_opportunityid_value') || '').toLowerCase().includes(kw) ||
+            (fv(m, '_msp_workloadlkid_value') || '').toLowerCase().includes(kw)
+          );
+        }
+        if (taskFilterParam && taskFilterParam !== 'all') {
+          milestones = await applyTaskFilter(crmClient, milestones, taskFilterParam);
+        }
+        if (format === 'summary') return text(buildMilestoneSummary(milestones));
+        return text({ count: milestones.length, milestones });
       } else if (opportunityId) {
         const nid = normalizeGuid(opportunityId);
         if (!isValidGuid(nid)) return error('Invalid opportunityId GUID');
@@ -199,8 +296,92 @@ export function registerTools(server, crmClient) {
         query: { $filter: filter, $select: MILESTONE_SELECT, $orderby: 'msp_milestonedate' }
       });
       if (!result.ok) return error(`Get milestones failed (${result.status}): ${result.data?.message}`);
-      const milestones = result.data?.value || [];
+      let milestones = result.data?.value || [];
+
+      // Post-query filters
+      if (statusFilter === 'active') {
+        milestones = milestones.filter(m => ACTIVE_STATUSES.has(fv(m, 'msp_milestonestatus')));
+      }
+      if (keyword) {
+        const kw = keyword.toLowerCase();
+        milestones = milestones.filter(m =>
+          (m.msp_name || '').toLowerCase().includes(kw) ||
+          (fv(m, '_msp_opportunityid_value') || '').toLowerCase().includes(kw) ||
+          (fv(m, '_msp_workloadlkid_value') || '').toLowerCase().includes(kw)
+        );
+      }
+      if (taskFilterParam && taskFilterParam !== 'all') {
+        milestones = await applyTaskFilter(crmClient, milestones, taskFilterParam);
+      }
+      if (format === 'summary') return text(buildMilestoneSummary(milestones));
       return text({ count: milestones.length, milestones });
+    }
+  );
+
+  // ── get_my_active_opportunities ─────────────────────────────
+  server.tool(
+    'get_my_active_opportunities',
+    'Returns active opportunities where you are the owner or on the deal team (via milestone ownership). Optionally filter by customer name.',
+    {
+      customerKeyword: z.string().optional().describe('Case-insensitive customer name filter')
+    },
+    async ({ customerKeyword }) => {
+      const whoAmI = await crmClient.request('WhoAmI');
+      if (!whoAmI.ok || !whoAmI.data?.UserId) {
+        return error(`Unable to resolve current CRM user (${whoAmI.status}): ${whoAmI.data?.message || 'WhoAmI failed'}`);
+      }
+      const userId = normalizeGuid(whoAmI.data.UserId);
+
+      // 1. Owned opportunities
+      const ownedResult = await crmClient.requestAllPages('opportunities', {
+        query: { $filter: `_ownerid_value eq '${userId}' and statecode eq 0`, $select: OPP_SELECT, $orderby: 'name' }
+      });
+      const ownedOpps = (ownedResult.ok ? ownedResult.data?.value : []) || [];
+      const ownedIds = new Set(ownedOpps.map(o => o.opportunityid));
+
+      // 2. Discover deal-team opps via milestones owned by user
+      const msResult = await crmClient.requestAllPages('msp_engagementmilestones', {
+        query: { $filter: `_ownerid_value eq '${userId}'`, $select: '_msp_opportunityid_value' }
+      });
+      const dealTeamOppIds = [];
+      if (msResult.ok && msResult.data?.value) {
+        for (const m of msResult.data.value) {
+          const oppId = m._msp_opportunityid_value;
+          if (oppId && !ownedIds.has(oppId) && !dealTeamOppIds.includes(oppId)) dealTeamOppIds.push(oppId);
+        }
+      }
+
+      // 3. Fetch deal-team opportunities
+      let dealTeamOpps = [];
+      if (dealTeamOppIds.length) {
+        const dtFilter = dealTeamOppIds.map(id => `opportunityid eq '${id}'`).join(' or ');
+        const dtResult = await crmClient.requestAllPages('opportunities', {
+          query: { $filter: `(${dtFilter}) and statecode eq 0`, $select: OPP_SELECT, $orderby: 'name' }
+        });
+        if (dtResult.ok && dtResult.data?.value) dealTeamOpps = dtResult.data.value;
+      }
+
+      // 4. Combine and tag
+      let opportunities = [
+        ...ownedOpps.map(o => ({
+          ...o,
+          customer: fv(o, '_parentaccountid_value') || null,
+          relationship: 'owner'
+        })),
+        ...dealTeamOpps.map(o => ({
+          ...o,
+          customer: fv(o, '_parentaccountid_value') || null,
+          relationship: 'deal-team'
+        }))
+      ];
+
+      // 5. Filter by customerKeyword
+      if (customerKeyword) {
+        const kw = customerKeyword.toLowerCase();
+        opportunities = opportunities.filter(o => (o.customer || '').toLowerCase().includes(kw));
+      }
+
+      return text({ count: opportunities.length, opportunities });
     }
   );
 
@@ -399,11 +580,42 @@ export function registerTools(server, crmClient) {
   // ── get_milestone_activities ────────────────────────────────
   server.tool(
     'get_milestone_activities',
-    'List tasks/activities linked to an engagement milestone.',
+    'List tasks/activities linked to one or more engagement milestones. Supports batch retrieval via milestoneIds array.',
     {
-      milestoneId: z.string().describe('Engagement milestone GUID')
+      milestoneId: z.string().optional().describe('Single engagement milestone GUID'),
+      milestoneIds: z.array(z.string()).optional().describe('Array of milestone GUIDs for batch retrieval')
     },
-    async ({ milestoneId }) => {
+    async ({ milestoneId, milestoneIds }) => {
+      // Batch mode
+      if (milestoneIds?.length) {
+        const validIds = milestoneIds.map(normalizeGuid).filter(isValidGuid);
+        if (!validIds.length) return error('No valid milestone GUIDs in milestoneIds');
+        const chunks = [];
+        for (let i = 0; i < validIds.length; i += 25) chunks.push(validIds.slice(i, i + 25));
+        const allTasks = [];
+        for (const chunk of chunks) {
+          const batchFilter = chunk.map(id => `_regardingobjectid_value eq '${id}'`).join(' or ');
+          const batchResult = await crmClient.requestAllPages('tasks', {
+            query: {
+              $filter: batchFilter,
+              $select: 'activityid,subject,scheduledend,statuscode,statecode,_ownerid_value,description,msp_taskcategory,_regardingobjectid_value',
+              $orderby: 'createdon desc'
+            }
+          });
+          if (batchResult.ok && batchResult.data?.value) allTasks.push(...batchResult.data.value);
+        }
+        // Group by milestone
+        const byMilestone = {};
+        for (const t of allTasks) {
+          const msId = t._regardingobjectid_value;
+          if (!byMilestone[msId]) byMilestone[msId] = [];
+          byMilestone[msId].push(t);
+        }
+        return text({ count: allTasks.length, byMilestone });
+      }
+
+      // Single mode (backward-compatible)
+      if (!milestoneId) return error('Provide milestoneId or milestoneIds');
       const nid = normalizeGuid(milestoneId);
       if (!isValidGuid(nid)) return error('Invalid milestoneId GUID');
 
@@ -418,6 +630,97 @@ export function registerTools(server, crmClient) {
       if (!result.ok) return error(`Get activities failed (${result.status}): ${result.data?.message}`);
       const tasks = result.data?.value || [];
       return text({ count: tasks.length, tasks });
+    }
+  );
+
+  // ── find_milestones_needing_tasks ───────────────────────────
+  server.tool(
+    'find_milestones_needing_tasks',
+    'Composite tool: resolves customer keywords → accounts → opportunities → milestones, then identifies milestones without linked tasks.',
+    {
+      customerKeywords: z.array(z.string()).describe('Array of customer name keywords to search'),
+      statusFilter: z.enum(['active', 'all']).optional().describe('Milestone status filter (default: active)')
+    },
+    async ({ customerKeywords, statusFilter = 'active' }) => {
+      if (!customerKeywords?.length) return error('At least one customerKeyword is required');
+
+      const customers = [];
+      let totalNeedingTasks = 0;
+
+      for (const keyword of customerKeywords) {
+        const sanitized = sanitizeODataString(keyword.trim());
+
+        // 1. Resolve accounts
+        const acctResult = await crmClient.requestAllPages('accounts', {
+          query: { $filter: `contains(name,'${sanitized}')`, $select: 'accountid,name', $top: '50' }
+        });
+        const accounts = acctResult.ok ? (acctResult.data?.value || []) : [];
+        if (!accounts.length) {
+          customers.push({ customer: keyword, error: 'No matching accounts found', milestonesNeedingTasks: 0, milestones: [] });
+          continue;
+        }
+
+        // 2. Get opportunities for matched accounts
+        const acctIds = accounts.map(a => a.accountid);
+        const acctFilter = acctIds.map(id => `_parentaccountid_value eq '${id}'`).join(' or ');
+        const oppResult = await crmClient.requestAllPages('opportunities', {
+          query: { $filter: `(${acctFilter}) and statecode eq 0`, $select: OPP_SELECT, $orderby: 'name' }
+        });
+        const opps = oppResult.ok ? (oppResult.data?.value || []) : [];
+        if (!opps.length) {
+          customers.push({ customer: keyword, milestonesNeedingTasks: 0, milestones: [], accounts: accounts.map(a => a.name) });
+          continue;
+        }
+
+        // 3. Get milestones for opportunities
+        const oppIds = opps.map(o => o.opportunityid);
+        const oppFilter = oppIds.map(id => `_msp_opportunityid_value eq '${id}'`).join(' or ');
+        const msResult = await crmClient.requestAllPages('msp_engagementmilestones', {
+          query: { $filter: oppFilter, $select: MILESTONE_SELECT, $orderby: 'msp_milestonedate' }
+        });
+        let milestones = msResult.ok ? (msResult.data?.value || []) : [];
+
+        // Apply status filter
+        if (statusFilter === 'active') {
+          milestones = milestones.filter(m => ACTIVE_STATUSES.has(fv(m, 'msp_milestonestatus')));
+        }
+
+        if (!milestones.length) {
+          customers.push({ customer: keyword, milestonesNeedingTasks: 0, milestones: [] });
+          continue;
+        }
+
+        // 4. Batch task check
+        const msIds = milestones.map(m => m.msp_engagementmilestoneid);
+        const taskFilter = msIds.map(id => `_regardingobjectid_value eq '${id}'`).join(' or ');
+        const taskResult = await crmClient.requestAllPages('tasks', {
+          query: { $filter: taskFilter, $select: '_regardingobjectid_value' }
+        });
+        const taskMsIds = new Set();
+        if (taskResult.ok && taskResult.data?.value) {
+          for (const t of taskResult.data.value) taskMsIds.add(t._regardingobjectid_value);
+        }
+
+        const needingTasks = milestones.filter(m => !taskMsIds.has(m.msp_engagementmilestoneid));
+        totalNeedingTasks += needingTasks.length;
+
+        customers.push({
+          customer: keyword,
+          milestonesNeedingTasks: needingTasks.length,
+          totalMilestones: milestones.length,
+          milestones: needingTasks.map(m => ({
+            id: m.msp_engagementmilestoneid,
+            number: m.msp_milestonenumber,
+            name: m.msp_name,
+            status: fv(m, 'msp_milestonestatus'),
+            date: toIsoDate(m.msp_milestonedate),
+            opportunity: fv(m, '_msp_opportunityid_value'),
+            workload: fv(m, '_msp_workloadlkid_value')
+          }))
+        });
+      }
+
+      return text({ totalMilestonesNeedingTasks: totalNeedingTasks, customers });
     }
   );
 
