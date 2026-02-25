@@ -117,7 +117,7 @@ For WorkIQ-heavy workflows, Copilot CLI is an ideal integration point to orchest
 
 ## Obsidian Vault Memory Layer (Optional)
 
-An optional local knowledge layer can be enabled using an Obsidian vault and the [`mcp-obsidian`](https://github.com/mcaps-copilot-tools/mcp-obsidian) MCP server. When configured, the agent prefetches customer/project context from your vault before hitting CRM endpoints, and promotes validated findings back into human-reviewable vault notes.
+An optional local knowledge layer can be enabled using an Obsidian vault and the [`mcp-obsidian`](https://mcp-obsidian.org/) MCP server. When configured, the agent prefetches customer/project context from your vault before hitting CRM endpoints, and promotes validated findings back into human-reviewable vault notes.
 
 This is **fully backwards-compatible** — if not configured, all workflows fall back to `.agent-memory/` with zero breakage.
 
@@ -135,11 +135,13 @@ This is **fully backwards-compatible** — if not configured, all workflows fall
 
    ```bash
    cd ..
-   git clone https://github.com/mcaps-copilot-tools/mcp-obsidian.git
+   git clone https://github.com/JinLee794/mcp-obsidian.git
    cd mcp-obsidian
    npm install
    npm run build
    ```
+
+   See [mcp-obsidian.org](https://mcp-obsidian.org/) for full documentation and alternative install methods.
 
 2. **Prepare your Obsidian vault** with these folders:
 
