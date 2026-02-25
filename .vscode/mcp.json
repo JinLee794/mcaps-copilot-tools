@@ -2,9 +2,11 @@
 	"servers": {
 		"msx-crm": {
 			"type": "stdio",
-			"command": "node",
+			"command": "/bin/zsh",
 			"args": [
-				"mcp-server/src/index.js"
+				"-l",
+				"-c",
+				"node mcp-server/src/index.js"
 			],
 			"env": {
 				"MSX_CRM_URL": "https://microsoftsales.crm.dynamics.com",
@@ -19,6 +21,25 @@
 				"mcp"
 			],
 			"type": "stdio"
+		},
+		"mcp-obsidian": {
+			"command": "node",
+			"args": [
+				"${workspaceFolder}/../mcp-obsidian/dist/server.js",
+				"${env:OBSIDIAN_VAULT_PATH}"
+			]
+			// Optional: enables vault memory layer (prefetch + durable promotion).
+			// Setup: Clone https://github.com/mcaps-copilot-tools/mcp-obsidian locally
+			// Run: npm install && npm run build in the mcp-obsidian directory
+			// Set OBSIDIAN_VAULT_PATH environment variable to your Obsidian vault directory path
+			// If not configured, all workflows fall back to .agent-memory/ (no breakage).
+		},
+		"CopilotKit MCP": {
+			"command": "npx",
+			"args": [
+				"mcp-remote",
+				"https://mcp.copilotkit.ai"
+			]
 		}
 	},
 	"inputs": []
