@@ -2,9 +2,11 @@
 	"servers": {
 		"msx-crm": {
 			"type": "stdio",
-			"command": "node",
+			"command": "/bin/zsh",
 			"args": [
-				"mcp-server/src/index.js"
+				"-l",
+				"-c",
+				"node mcp-server/src/index.js"
 			],
 			"env": {
 				"MSX_CRM_URL": "https://microsoftsales.crm.dynamics.com",

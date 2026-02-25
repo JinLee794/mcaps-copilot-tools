@@ -33,3 +33,6 @@ temp/
 
 # Local agent memory (untracked)
 .agent-memory/
+
+# Beads local database/artifacts
+.beads/
