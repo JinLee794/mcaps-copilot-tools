@@ -22,19 +22,19 @@
 			],
 			"type": "stdio"
 		},
-		"mcp-obsidian": {
-			"command": "npx",
-			// "command": "node", 	// Use node if you're running the server locally (e.g., for development or with a local build of mcp-obsidian).
-			"args": [
-				// "${workspaceFolder}/../mcp-obsidian/dist/server.js",
-				"@mauricio.wolff/mcp-obsidian@latest",
-				"${input:obsidianVaultPath}"
-			]
-			// Optional: enables vault memory layer (prefetch + durable promotion).
-			// Setup: Clone https://github.com/bitbonsai/mcp-obsidian locally
-			// Run: npm install && npm run build in the mcp-obsidian directory
-			// If not configured, all workflows fall back to .agent-memory/ (no breakage).
-		},
+		// "mcp-obsidian": {
+		// 	"command": "npx",
+		// 	// "command": "node", 	// Use node if you're running the server locally (e.g., for development or with a local build of mcp-obsidian).
+		// 	"args": [
+		// 		// "${workspaceFolder}/../mcp-obsidian/dist/server.js",
+		// 		"@mauricio.wolff/mcp-obsidian@latest",
+		// 		"${input:obsidianVaultPath}"
+		// 	]
+		// 	// Optional: enables vault memory layer (prefetch + durable promotion).
+		// 	// Setup: Clone https://github.com/mcaps-copilot-tools/mcp-obsidian locally
+		// 	// Run: npm install && npm run build in the mcp-obsidian directory
+		// 	// If not configured, all workflows fall back to .agent-memory/ (no breakage).
+		// },
 		"CopilotKit MCP": {
 			"command": "npx",
 			"args": [

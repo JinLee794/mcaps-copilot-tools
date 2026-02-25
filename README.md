@@ -1,171 +1,264 @@
 # MCAPS Copilot Tools
 
-MCAPS Copilot Tools is an MCP-first repository for role-aware sales execution in MCAPS. It combines:
+> **Your AI-powered sales operations toolkit for MCAPS.**
+> Talk to Copilot in plain English to manage MSX opportunities, milestones, and tasks — no coding required.
 
-- role workflows codified as reusable Copilot skills
-- MSX CRM MCP tools for opportunity/milestone/task operations
-- WorkIQ MCP tools for Microsoft 365 evidence retrieval
-- customization patterns for day-to-day agentic operations
+MCAPS Copilot Tools connects GitHub Copilot (in VS Code) to your MSX CRM and Microsoft 365 data through [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) servers. Instead of clicking through MSX screens, you describe what you need in the Copilot chat window and the tools do it for you.
 
-This repo started as an MSX Helper MCP server and has expanded into a broader operational toolkit.
+**What can it do?**
 
-## Project Layout
+- **Read MSX data** — look up opportunities, milestones, tasks, and ownership.
+- **Update MSX records** — create tasks, close milestones, update statuses (with confirmation before any write).
+- **Search M365 evidence** — find relevant Teams chats, meeting transcripts, emails, and documents via WorkIQ.
+- **Role-aware guidance** — the system knows MCAPS roles (SE, CSA, CSAM, Specialist) and tailors its behavior accordingly.
 
-- `mcp-server/` — Node.js MCP server implementation for MSX CRM tools
-- `.github/skills/` — MCAPS role skills and WorkIQ query-scoping skill
-- `.github/instructions/` — role/write-gate operational instructions
-- `docs/` — architecture and supporting documentation
+---
 
-## Boilerplate Included
+## Quick Start (5 Minutes)
 
-This repository is a practical MCAPS Copilot boilerplate for role-driven, MCP-first operations.
+> **Prerequisites:** [VS Code](https://code.visualstudio.com/) (or VS Code Insiders) with the [GitHub Copilot extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat) installed, [Node.js 18+](https://nodejs.org/), and [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli).
 
-It includes:
-
-- role skill definitions for core MCAPS personas:
-	- [Solution Engineer](.github/skills/Solution_Engineer_SKILL.md)
-	- [Cloud Solution Architect](.github/skills/Cloud_Solution_Architect_SKILL.md)
-	- [Customer Success Account Manager](.github/skills/CSAM_SKILL.md)
-	- [Specialist](.github/skills/Specialist_SKILL.md)
-- MSX role and write confirmation gate instructions to guide safe write-intent workflows:
-	- [msx-role-and-write-gate.instructions.md](.github/instructions/msx-role-and-write-gate.instructions.md)
-
-Use this as the default scaffold when you want consistent role routing, approval-gated updates, and repeatable day-to-day sales operations.
-
-## What This Repo Provides
-
-### MSX CRM MCP tools
-
-The server currently includes tools to:
-
-- validate CRM authentication and identity (`crm_whoami`)
-- run read-only OData queries (`crm_query`, `crm_get_record`)
-- list opportunities and milestones (`list_opportunities`, `get_milestones`)
-- return render-ready views for timeline/cost/diff experiences (`view_milestone_timeline`, `view_opportunity_cost_trend`, `view_staged_changes_diff`)
-- perform write-oriented task/milestone operations (`create_task`, `update_task`, `close_task`, `update_milestone`)
-
-### Role skills for MCAPS workflows
-
-The following role definitions are maintained as skills:
-
-- `Solution Engineer` → [.github/skills/Solution_Engineer_SKILL.md](.github/skills/Solution_Engineer_SKILL.md)
-- `Cloud Solution Architect` → [.github/skills/Cloud_Solution_Architect_SKILL.md](.github/skills/Cloud_Solution_Architect_SKILL.md)
-- `Customer Success Account Manager` → [.github/skills/CSAM_SKILL.md](.github/skills/CSAM_SKILL.md)
-- `Specialist` → [.github/skills/Specialist_SKILL.md](.github/skills/Specialist_SKILL.md)
-
-These skills define boundaries, workflow expectations, and handoff behavior for agentic operations.
-
-### WorkIQ + CRM automation model
-
-The repo is designed to automate day-to-day sales workflows by combining systems of record:
-
-- MSX CRM MCP for structured sales data and state changes
-- WorkIQ MCP for M365 evidence (meetings, chats, email, files)
-- role-gated planning and confirmation before write-intent actions
-
-## Quick Start
-
-From the repo root:
+### Step 1: Clone and install
 
 ```bash
-cd mcp-server
+git clone https://github.com/JinLee794/mcaps-copilot-tools.git
+cd mcaps-copilot-tools/mcp/msx
 npm install
-npm test
-npm start
 ```
 
-## Agentic Frontend (Electron MVP)
+### Step 2: Sign in to Azure
 
-A local Electron-first frontend now exists under `frontend/` with:
-
-- Electron runtime (main + preload + renderer)
-- local orchestration API with AG-UI-compatible SSE at `POST /api/copilot/run`
-- role-skill binding to `.github/skills/*.md` with write-intent approval guard
-- runtime MCP manager backed by `.vscode/mcp.json` + `.vscode/mcp.runtime.overlay.json`
-- WorkIQ Context Explorer and tool-trace/context-stack views in renderer
-
-Run locally:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-This launches the Electron app and starts orchestration APIs on `http://127.0.0.1:3100`.
-
-### Runtime Notes
-
-- The orchestration API emits normalized AG-UI lifecycle/tool/state/activity events.
-- `copilotkit` is treated as expected MCP baseline and surfaced in diagnostics if unavailable.
-- Run requests support `provider: "copilot-sdk" | "copilot-cli"`.
-- `copilot-sdk` is the primary provider. If GitHub Packages auth is unavailable, set:
-	- `COPILOT_SDK_ADAPTER_MODULE=./src/main/copilot-sdk-adapter.local.js`
-	- this uses a local bridge that executes `copilot chat --message ...`.
-
-## Configuration
-
-Authentication is performed through Azure CLI. Make sure you are signed in first:
+The MSX CRM tools authenticate through Azure CLI. Sign in with your Microsoft corp account:
 
 ```bash
 az login
 ```
 
-## MCP Integration
+### Step 3: Open the repo in VS Code
 
-This server runs on stdio transport and can be wired into MCP-compatible clients/editors by pointing to the Node entrypoint in `mcp-server/src/index.js` (or the `msx-mcp` binary after package install).
+```bash
+# from the repo root
+code .
+```
 
-For WorkIQ-heavy workflows, Copilot CLI is an ideal integration point to orchestrate role skills + `msx-crm` + `ask_work_iq` in a single agentic loop.
+### Step 4: Start the MCP servers
 
-### Startup Flow (Recommended)
+1. Open the file `.vscode/mcp.json` in VS Code. You should see a **"Start"** button above each server definition.
+2. Click **Start** on `msx-crm` (required) and `workiq` (optional, for M365 searches).
+3. That's it — the tools are now available inside Copilot chat.
 
-1. Open and review the MCP server config: [.vscode/mcp.json](.vscode/mcp.json).
-2. In your MCP-capable client/editor, **start** the configured MCP servers from that file.
-3. Run your workflow using either:
-	- the GitHub Copilot session window in VS Code, or
-	- GitHub Copilot CLI (`copilot`) from the repo root.
-4. Verify tool routing by using `msx-crm` for CRM facts and `ask_work_iq` for M365 evidence.
+### Step 5: Open Copilot and start chatting
 
-## Recommended Copilot Workflow (MCP-first)
+Open the GitHub Copilot chat panel (`Ctrl+Shift+I` / `Cmd+Shift+I`) and try one of the example prompts below.
 
-- Use the configured workspace MCP server (`.vscode/mcp.json`, server name `msx-crm`) for CRM operations.
-- Use the configured WorkIQ MCP server for Microsoft 365 retrieval (`ask_work_iq`) when evidence is in Teams chats/channels, meetings/transcripts, Outlook email/calendar, or SharePoint/OneDrive files.
-- Invoke MSX CRM operations through MCP tools, not ad-hoc local scripts.
-- Route by system of record:
-	- MSX CRM facts (opportunities, milestones, tasks, ownership, status) → `msx-crm` tools.
-	- M365 collaboration evidence (conversations, meetings, docs, mail) → WorkIQ MCP.
-- Avoid creating one-off files under `mcp-server/.tmp` for standard read/update flows unless explicitly troubleshooting.
-- For write-intent changes, use role mapping and explicit confirmation gates before execution.
+---
 
-## Customization Capabilities
+## Example Prompts to Get Started
 
-The repository is built for high customization in agent behavior:
+Copy-paste any of these into the Copilot chat window after you've started the MCP servers.
 
-- role skills can be updated as operating models evolve
-- instruction files can enforce workflow gates and safety requirements
-- MCP tool composition supports tailored, repeatable sales operations
+### Getting oriented
 
-## WorkIQ Scope Intake Template
+| What you want | Prompt to try |
+|---|---|
+| Check your CRM identity | `Who am I in MSX? Use crm_whoami to check.` |
+| See your role | `What's my MSX role?` |
+| Understand what tools are available | `What MCP tools do I have available for MSX?` |
 
-For broad WorkIQ requests, use the dedicated skill playbook:
+### Reading CRM data
 
-- [.github/skills/WorkIQ_Query_Scoping_SKILL.md](.github/skills/WorkIQ_Query_Scoping_SKILL.md)
+| What you want | Prompt to try |
+|---|---|
+| List your opportunities | `Show me my active opportunities for Contoso.` |
+| Check milestones for an opportunity | `What milestones are on the Contoso Azure Migration opportunity?` |
+| Find milestones that need tasks | `Which of my milestones across Contoso and Fabrikam are missing tasks?` |
+| View a milestone timeline | `Show me a timeline view of milestones for Contoso.` |
 
-This skill defines the fact-map intake contract, clarification rules, safe defaults, and two-pass retrieval strategy to keep query scope focused.
+### Writing CRM data (with confirmation)
 
-Typical WorkIQ retrieval examples:
-- Teams: chat/thread decisions, channel updates, action ownership.
-- Meetings: transcript evidence, decisions, blockers, next steps.
-- Outlook: stakeholder communication trail, commitments, follow-ups.
-- SharePoint/OneDrive: latest proposal/design docs and revision context.
+| What you want | Prompt to try |
+|---|---|
+| Create a task | `Create a task under the "Cloud Assessment" milestone for Contoso: "Schedule architecture review with customer" due next Friday.` |
+| Close a task | `Close the "Schedule architecture review" task for Contoso — it's done.` |
+| Update a milestone | `Update the Cloud Assessment milestone status to "On Track".` |
 
-Reference:
-- WorkIQ overview: https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/workiq-overview
+> **Note:** All write operations will ask you to confirm before anything is changed. You always get a chance to review and approve.
+
+### Searching M365 evidence (WorkIQ)
+
+| What you want | Prompt to try |
+|---|---|
+| Find meeting notes | `What was discussed in my last meeting with the Contoso team?` |
+| Search Teams chats | `Find recent Teams messages about the Fabrikam deal.` |
+| Look up emails | `Show me recent emails from the Contoso stakeholders about the migration timeline.` |
+
+### Role-based workflows
+
+| What you want | Prompt to try |
+|---|---|
+| Work as a Solution Engineer | `I'm a Solution Engineer. What milestones should I focus on for Contoso this week?` |
+| Work as a CSAM | `As a CSAM, walk me through my milestone hygiene for this quarter.` |
+| Weekly milestone review | `Run a weekly milestone hygiene check across all my active customers.` |
+
+---
+
+## Optional: Enable Obsidian Vault Integration
+
+If you use [Obsidian](https://obsidian.md/) as a local knowledge base, you can connect it as an additional MCP server. This gives Copilot read/write access to your vault for durable customer notes, prior findings, and session context.
+
+### How to enable it
+
+1. Open `.vscode/mcp.json` in your editor.
+2. Find the commented-out `"mcp-obsidian"` block (around line 23).
+3. Uncomment the entire block so it looks like this:
+
+```jsonc
+"mcp-obsidian": {
+    "command": "npx",
+    "args": [
+        "@mauricio.wolff/mcp-obsidian@latest",
+        "${input:obsidianVaultPath}"
+    ]
+},
+```
+
+4. When prompted, enter the absolute path to your Obsidian vault (e.g., `/Users/yourname/Documents/MyVault`).
+   - Alternatively, set the `OBSIDIAN_VAULT_PATH` environment variable and it will use that as the default.
+5. Click **Start** on `mcp-obsidian` in VS Code just like the other servers.
+
+> **Don't use Obsidian?** No worries — everything works without it. The system falls back to `.agent-memory/` for local context storage automatically.
+
+---
+
+## Project Layout
+
+| Folder | What's inside |
+|---|---|
+| `mcp/msx/` | Node.js MCP server for MSX CRM tools (the main engine) |
+| `.github/skills/` | Role-specific Copilot skills (SE, CSA, CSAM, Specialist, WorkIQ scoping) |
+| `.github/instructions/` | Operational instructions (role/write gates, CRM schema, intent resolution) |
+| `docs/` | Architecture docs and supporting documentation |
+| `recipes/` | Reusable workflow recipes (e.g., weekly milestone hygiene) |
+
+## What's Included
+
+### MSX CRM MCP Tools
+
+These tools let Copilot interact with MSX CRM on your behalf:
+
+| Tool | What it does |
+|---|---|
+| `crm_whoami` | Checks who you are in MSX (validates authentication) |
+| `crm_query` | Runs read-only OData queries against CRM |
+| `crm_get_record` | Fetches a specific CRM record by ID |
+| `list_opportunities` | Lists opportunities, filterable by customer |
+| `get_milestones` | Lists milestones for an opportunity or owner |
+| `find_milestones_needing_tasks` | Finds milestones across customers that need task attention |
+| `create_task` | Creates a new task under a milestone |
+| `update_task` / `close_task` | Updates or closes an existing task |
+| `update_milestone` | Updates milestone status or details |
+| `view_milestone_timeline` | Returns a timeline view of milestones |
+| `view_opportunity_cost_trend` | Returns cost trend data for an opportunity |
+
+### Role Skills
+
+The system includes pre-built role definitions that shape how Copilot approaches your workflows:
+
+- **[Solution Engineer](.github/skills/Solution_Engineer_SKILL.md)** — technical win execution, architecture reviews, proof-of-concept work
+- **[Cloud Solution Architect](.github/skills/Cloud_Solution_Architect_SKILL.md)** — cloud architecture, migration planning, technical design
+- **[Customer Success Account Manager](.github/skills/CSAM_SKILL.md)** — milestone delivery, consumption tracking, customer health
+- **[Specialist](.github/skills/Specialist_SKILL.md)** — deal qualification, pipeline support, solution area depth
+
+You don't need to memorize these — just tell Copilot your role and it will apply the right behavior.
+
+### WorkIQ (M365 Evidence Retrieval)
+
+WorkIQ connects Copilot to your Microsoft 365 data. It can search across:
+
+- **Teams** — chat/thread decisions, channel updates, action ownership
+- **Meetings** — transcript evidence, decisions, blockers, next steps
+- **Outlook** — stakeholder communication trail, commitments, follow-ups
+- **SharePoint/OneDrive** — latest proposal/design docs and revision context
+
+Learn more: [WorkIQ overview (Microsoft Learn)](https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/workiq-overview)
+
+---
+
+## How It Works (Under the Hood)
+
+```
+You (Copilot Chat)
+  │
+  ├── asks about CRM data ──→ msx-crm MCP server ──→ MSX Dynamics 365
+  ├── asks about M365 data ──→ workiq MCP server  ──→ Teams / Outlook / SharePoint
+  └── asks about notes     ──→ mcp-obsidian (optional) ──→ Your Obsidian Vault
+```
+
+1. You type a question or action in Copilot chat.
+2. Copilot reads the role skills and instruction files in this repo to understand how to behave.
+3. It routes your request to the right MCP server (CRM, WorkIQ, or Obsidian).
+4. For read operations, it returns the results directly.
+5. For write operations, it shows you what it plans to change and waits for your approval.
+
+---
+
+## Configuration
+
+### Authentication
+
+All CRM operations authenticate through Azure CLI:
+
+```bash
+az login
+```
+
+Make sure you're signed in with your Microsoft corp account before starting the MCP servers.
+
+### MCP Server Config
+
+The file [.vscode/mcp.json](.vscode/mcp.json) defines which MCP servers are available. Out of the box, it includes:
+
+| Server | Status | Purpose |
+|---|---|---|
+| `msx-crm` | **Enabled** | MSX CRM operations (opportunities, milestones, tasks) |
+| `workiq` | **Enabled** | Microsoft 365 evidence retrieval (Teams, Outlook, SharePoint) |
+| `mcp-obsidian` | Commented out | Optional Obsidian vault integration for local knowledge |
+| `CopilotKit MCP` | **Enabled** | CopilotKit baseline for agent diagnostics |
+
+## Customization
+
+This repo is designed to be forked and customized for your team:
+
+- **Role skills** — edit the files in `.github/skills/` to match your team's operating model
+- **Instruction files** — update `.github/instructions/` to enforce workflow gates or add safety checks
+- **Recipes** — add reusable workflows in `recipes/` for common cadences (weekly reviews, quarterly planning)
+- **MCP composition** — add or swap MCP servers in `.vscode/mcp.json` to connect new data sources
+
+---
+
+## Frequently Asked Questions
+
+**Do I need to know how to code?**
+No. The primary interface is the Copilot chat window — you type in plain English and Copilot does the rest. The code in this repo powers the tools behind the scenes.
+
+**Is it safe to use? Will it change my CRM data without asking?**
+No write operation happens without your explicit approval. Every create, update, or close action shows you a confirmation prompt first.
+
+**What if I don't have an Obsidian vault?**
+Everything works fine without it. Obsidian integration is entirely optional.
+
+**Can I use this outside VS Code?**
+The MCP servers can work with any MCP-compatible client, but VS Code with GitHub Copilot is the recommended and best-supported experience.
+
+**What if `az login` fails or my token expires?**
+Run `az login` again. The MCP server uses Azure CLI tokens, so keeping your session active is all you need.
+
+---
 
 ## Inspiration and Thanks
 
-Big thanks to the original MSX Helper project for the foundation and inspiration that helped shape this into an MCP server:
+Big thanks to the original MSX Helper project for the foundation and inspiration that helped shape this into an MCP server.
 
 ## License
 
-MIT (see `mcp-server/package.json`)
+MIT (see `mcp/msx/package.json`)
