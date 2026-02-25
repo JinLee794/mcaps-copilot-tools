@@ -1,38 +1,105 @@
+---
+description: "CRM entity schema reference for Dynamics 365 OData queries. Use when constructing crm_query, crm_get_record, or any OData filter/select expressions to avoid property name guessing."
+applyTo: "mcp-server/**"
+---
 # CRM Entity Schema Reference
 
 Use this reference when constructing `crm_query` calls against Dynamics 365 entities.
 Incorrect entity set names or field names will return 404 or 400 errors.
 
-## Milestone Entity
+## Rules
+- **Never guess property names.** Use only the property names listed below or discovered via `crm_list_entity_properties`.
+- If a needed property is not listed here, call `crm_list_entity_properties` with the entity logical name before querying.
+- Lookup/reference fields always use the pattern `_<fieldname>_value` (e.g. `_ownerid_value`, `_parentaccountid_value`).
+- Entity set names are **plural** (e.g. `accounts`, `opportunities`). Entity logical names for metadata are **singular** (e.g. `account`, `opportunity`).
 
-- **Entity set**: `msp_engagementmilestones`
-- **Primary key**: `msp_engagementmilestoneid`
+## Common Entities
 
-### Valid Fields ($select)
+### accounts (logical name: account)
+| Property | Type | Description |
+|---|---|---|
+| accountid | Uniqueidentifier | Primary key |
+| name | String | Account name |
+| msp_mstopparentid | String | MS Top Parent ID (TPID) — **NOT** `msp_accounttpid` |
+| _ownerid_value | Lookup | Owner system user |
+| _parentaccountid_value | Lookup | Parent account |
 
-```
-msp_engagementmilestoneid, msp_milestonenumber, msp_name,
-_msp_workloadlkid_value, msp_commitmentrecommendation,
-msp_milestonecategory, msp_monthlyuse, msp_milestonedate,
-msp_milestonestatus, _ownerid_value, _msp_opportunityid_value,
-msp_forecastcommentsjsonfield, msp_forecastcomments
-```
+### opportunities (logical name: opportunity)
+| Property | Type | Description |
+|---|---|---|
+| opportunityid | Uniqueidentifier | Primary key |
+| name | String | Opportunity name |
+| estimatedclosedate | DateTime | Estimated close date |
+| msp_estcompletiondate | DateTime | Estimated completion date |
+| msp_consumptionconsumedrecurring | Decimal | Consumed recurring consumption |
+| _ownerid_value | Lookup | Owner system user |
+| _parentaccountid_value | Lookup | Parent account |
+| msp_salesplay | Picklist | Sales play / solution area |
+| statecode | State | Record state (0 = Open) |
 
-### Known Invalid Entity Sets (DO NOT USE)
+### msp_engagementmilestones (logical name: msp_engagementmilestone)
+| Property | Type | Description |
+|---|---|---|
+| msp_engagementmilestoneid | Uniqueidentifier | Primary key |
+| msp_milestonenumber | String | Milestone number (e.g. "7-123456789") |
+| msp_name | String | Milestone name |
+| _msp_workloadlkid_value | Lookup | Workload |
+| msp_commitmentrecommendation | Picklist | Commitment recommendation |
+| msp_milestonecategory | Picklist | Milestone category |
+| msp_monthlyuse | Decimal | Monthly use value |
+| msp_milestonedate | DateTime | Milestone date |
+| msp_milestonestatus | Picklist | Milestone status |
+| _ownerid_value | Lookup | Owner system user |
+| _msp_opportunityid_value | Lookup | Parent opportunity |
+| msp_forecastcomments | String | Forecast comments |
+| msp_forecastcommentsjsonfield | String | Forecast comments (JSON) |
+
+### tasks (logical name: task)
+| Property | Type | Description |
+|---|---|---|
+| activityid | Uniqueidentifier | Primary key |
+| subject | String | Task subject/title |
+| description | String | Task description |
+| scheduledend | DateTime | Due date |
+| statuscode | Status | Status code (5=Completed, 6=Cancelled) |
+| statecode | State | Record state |
+| _ownerid_value | Lookup | Owner system user |
+| _regardingobjectid_value | Lookup | Regarding record |
+| msp_taskcategory | Picklist | Task category |
+| createdon | DateTime | Created timestamp |
+
+### systemusers (logical name: systemuser)
+| Property | Type | Description |
+|---|---|---|
+| systemuserid | Uniqueidentifier | Primary key |
+| fullname | String | Full name |
+| internalemailaddress | String | Email address |
+| title | String | Job title |
+| businessunitid | Lookup | Business unit |
+
+## Known Invalid Entity Sets (DO NOT USE)
 
 | Attempted | Error | Correct |
 |-----------|-------|---------|
 | `msp_milestones` | 404 | `msp_engagementmilestones` |
 | `msp_milestoneses` | 404 | `msp_engagementmilestones` |
 
-### Known Invalid Fields (DO NOT USE)
+## Known Invalid Fields (DO NOT USE)
 
 | Field | Error | Notes |
 |-------|-------|-------|
 | `msp_forecastedconsumptionrecurring` | 400 — not a valid property | Does not exist on `msp_engagementmilestone` |
 | `msp_committedconsumptionrecurring` | 400 — not a valid property | Does not exist on `msp_engagementmilestone` |
 
-### Milestone Status Codes
+## Common Mistakes to Avoid
+- ❌ `msp_accounttpid` → ✅ `msp_mstopparentid` (TPID on accounts)
+- ❌ `ownerid` in $filter → ✅ `_ownerid_value` (lookup pattern)
+- ❌ `parentaccountid` in $filter → ✅ `_parentaccountid_value`
+- ❌ `opportunityid` in milestone filter → ✅ `_msp_opportunityid_value`
+- ❌ `taskid` → ✅ `activityid` (tasks use activity primary key)
+- ❌ `msp_engagementmilestone` as entity set → ✅ `msp_engagementmilestones` (plural)
+
+## Milestone Status Codes
 
 | Label | Value |
 |-------|-------|
@@ -44,31 +111,18 @@ msp_forecastcommentsjsonfield, msp_forecastcomments
 | Not Started | `861980005` |
 | Closed as Incomplete | `861980007` |
 
-### Commitment Recommendation Codes
+## Commitment Recommendation Codes
 
 | Label | Value |
 |-------|-------|
 | Uncommitted | `861980000` |
 | Committed | `861980001` |
 
-### Milestone Category Codes
+## Milestone Category Codes
 
 | Label | Value |
 |-------|-------|
 | POC/Pilot | `861980000` |
-
-## Opportunity Entity
-
-- **Entity set**: `opportunities`
-- **Primary key**: `opportunityid`
-
-### Valid Fields ($select)
-
-```
-opportunityid, name, estimatedclosedate,
-msp_estcompletiondate, msp_consumptionconsumedrecurring,
-_ownerid_value, _parentaccountid_value, msp_salesplay
-```
 
 ## Filtering Milestones via `crm_query`
 
@@ -119,3 +173,10 @@ The `get_milestones` tool only accepts these parameters (defined in `mcp-server/
 - `statusFilter` — use `crm_query` with `msp_milestonestatus` filter instead
 - `taskFilter` — not supported; use `get_milestone_activities` after retrieving milestones
 - `format` — not supported
+
+## Dynamic Schema Discovery
+When a property is not listed above, use the `crm_list_entity_properties` MCP tool:
+```
+crm_list_entity_properties({ entityLogicalName: "account", filter: "tpid" })
+```
+This returns all matching properties with their logical names and types.

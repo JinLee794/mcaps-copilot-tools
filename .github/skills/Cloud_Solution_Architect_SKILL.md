@@ -1,7 +1,17 @@
 ---
 name: cloud-solution-architect-msx-ops
 description: 'Cloud Solution Architect operating skill for MSX/MCEM. Drives committed milestone execution monitoring, Stage 4-5 value realization, architecture-to-execution handoff, and delivery ownership disambiguation. Use when user identifies as CSA or Cloud Solution Architect, or asks about execution readiness, committed milestone health, value realization packs, architecture handoff notes, or CSA-vs-CSAM authority boundaries.'
-argument-hint: 'Provide opportunity/milestone IDs, execution state, and the outcome needed'
+argument-hint: 'Provide opportunity/milestone IDs, commitment state, execution state, delivery dependencies, and the outcome needed'
+---
+
+# Agent Skill Profile
+
+> **Purpose**: This SKILL.md defines role-specific responsibilities and communication patterns for managing **Microsoft Sales Experience (MSX)** in alignment with the **Microsoft Customer Engagement Methodology (MCEM)**.
+>
+> **Audience**: Field roles and copilots/agents supporting those roles.
+>
+> **Scope**: Opportunity & milestone management, pipeline hygiene, role-to-role handoffs, and cross-role orchestration.
+
 ---
 
 # Cloud Solution Architect (CSA) MSX/MCEM Operations

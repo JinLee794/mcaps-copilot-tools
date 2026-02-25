@@ -1,7 +1,17 @@
 ---
 name: specialist-msx-ops
 description: 'Specialist (STU) operating skill for MSX/MCEM. Drives Stage 2-3 pipeline creation, uncommitted milestone ownership, handoff readiness validation, pipeline hygiene triage, and Stage 2 signal intake from M365 sources. Use when user identifies as Specialist or STU, or asks about pipeline building, opportunity qualification, handoff readiness, pipeline hygiene exceptions, or Specialist-to-CSU transition planning.'
-argument-hint: 'Provide opportunity/milestone IDs, pipeline state, and the outcome needed'
+argument-hint: 'Provide opportunity/milestone IDs, pipeline stage, commitment state, and the outcome needed'
+---
+
+# Agent Skill Profile
+
+> **Purpose**: This SKILL.md defines role-specific responsibilities and communication patterns for managing **Microsoft Sales Experience (MSX)** in alignment with the **Microsoft Customer Engagement Methodology (MCEM)**.
+>
+> **Audience**: Field roles and copilots/agents supporting those roles.
+>
+> **Scope**: Opportunity & milestone management, pipeline hygiene, role-to-role handoffs, and cross-role orchestration.
+
 ---
 
 # Specialist (STU) MSX/MCEM Operations

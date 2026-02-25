@@ -1,7 +1,17 @@
 ---
 name: csam-msx-ops
 description: 'Customer Success Account Manager operating skill for MSX/MCEM. Manages committed milestone health, delivery accountability mapping, commit-gate enforcement, customer success plan alignment, adoption/usage coordination, and Unified constraint early warning. Use when user identifies as CSAM, or asks about delivery ownership, customer health reviews, commit readiness gates, success plan alignment, usage/adoption milestones, or CSAM-vs-CSA authority boundaries.'
-argument-hint: 'Provide opportunity/milestone IDs, delivery state, and the outcome needed'
+argument-hint: 'Provide opportunity/milestone IDs, customer health signals, delivery state, and the outcome needed'
+---
+
+# Agent Skill Profile
+
+> **Purpose**: This SKILL.md defines role-specific responsibilities and communication patterns for managing **Microsoft Sales Experience (MSX)** in alignment with the **Microsoft Customer Engagement Methodology (MCEM)**.
+>
+> **Audience**: Field roles and copilots/agents supporting those roles.
+>
+> **Scope**: Opportunity & milestone management, pipeline hygiene, role-to-role handoffs, and cross-role orchestration.
+
 ---
 
 # Customer Success Account Manager (CSAM) MSX/MCEM Operations
