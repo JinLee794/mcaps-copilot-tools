@@ -31,7 +31,7 @@
 				"${input:obsidianVaultPath}"
 			]
 			// Optional: enables vault memory layer (prefetch + durable promotion).
-			// Setup: Clone https://github.com/mcaps-copilot-tools/mcp-obsidian locally
+			// Setup: Clone https://github.com/bitbonsai/mcp-obsidian locally
 			// Run: npm install && npm run build in the mcp-obsidian directory
 			// If not configured, all workflows fall back to .agent-memory/ (no breakage).
 		},
