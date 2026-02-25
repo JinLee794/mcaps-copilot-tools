@@ -83,3 +83,24 @@ export function createAgUiEvent(
 ): AgUiEvent {
   return { type, timestamp: Date.now(), runId, data };
 }
+
+// ── CLI Activity Types ─────────────────────────────────────────
+
+export type CliActivityKind =
+  | 'skill_loaded'      // A SKILLS.md was parsed and loaded
+  | 'instruction_loaded' // An instruction file was added to context
+  | 'context_added'      // Generic context (system prompt, params) added
+  | 'tool_registered'    // MCP tool registered with the agent
+  | 'session_created'    // CLI session created
+  | 'prompt_sent'        // User prompt sent to the agent
+  | 'tool_invoked'       // Agent is calling a tool (live)
+  | 'tool_completed'     // Tool call finished (live)
+  | 'cli_log';           // Raw CLI log line
+
+export interface CliActivityEntry {
+  id: string;
+  kind: CliActivityKind;
+  label: string;
+  detail?: string;
+  timestamp: number;
+}

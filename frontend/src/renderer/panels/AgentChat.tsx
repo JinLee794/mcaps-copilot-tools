@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ToolCallLog } from '../components/ToolCallLog';
 import { ApprovalCard } from '../components/ApprovalCard';
+import { CliActivityStream } from '../components/CliActivityStream';
 import { useAgentState, useAgUiEvents } from '../hooks/useAgUiTransport';
 import type { ElectronAPI } from '../../main/preload';
 
@@ -23,7 +24,7 @@ export function AgentChat() {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { state } = useAgentState();
-  const { toolCalls, interrupt, streamingText } = useAgUiEvents();
+  const { toolCalls, interrupt, streamingText, cliActivity } = useAgUiEvents();
 
   // Append or update the assistant message as streaming text arrives
   useEffect(() => {
@@ -129,6 +130,9 @@ export function AgentChat() {
             {msg.content}
           </div>
         ))}
+
+        {/* CLI Activity Stream */}
+        {cliActivity.length > 0 && <CliActivityStream entries={cliActivity} />}
 
         {/* Tool Call Log */}
         {toolCalls.length > 0 && <ToolCallLog calls={toolCalls} />}

@@ -1,7 +1,7 @@
 // useAgUiTransport — listens for AG-UI events from main process, maintains agent state.
 // Uses React Context so all panels share a single subscription + state.
 import React, { useState, useEffect, useContext, createContext } from 'react';
-import type { AgUiEvent, AgUiEventType } from '../../shared/types/AgUiEvent';
+import type { AgUiEvent, AgUiEventType, CliActivityEntry } from '../../shared/types/AgUiEvent';
 import type { SalesAgentState } from '../../shared/types/SalesAgentState';
 import { createInitialState } from '../../shared/types/SalesAgentState';
 import type { ToolCallEntry } from '../components/ToolCallLog';
@@ -26,6 +26,8 @@ interface AgUiTransportValue {
   connected: boolean;
   /** Accumulated assistant text from TEXT_MESSAGE_CONTENT events (for AgentChat) */
   streamingText: string;
+  /** Live CLI activity entries (skills loaded, tools registered, etc.) */
+  cliActivity: CliActivityEntry[];
 }
 
 const AgUiTransportContext = createContext<AgUiTransportValue | null>(null);
@@ -39,6 +41,7 @@ export function AgUiTransportProvider({ children }: { children: React.ReactNode 
   const [interrupt, setInterrupt] = useState<InterruptState | null>(null);
   const [connected, setConnected] = useState(false);
   const [streamingText, setStreamingText] = useState('');
+  const [cliActivity, setCliActivity] = useState<CliActivityEntry[]>([]);
 
   useEffect(() => {
     if (!window.electronAPI) return;
@@ -52,6 +55,7 @@ export function AgUiTransportProvider({ children }: { children: React.ReactNode 
           setInterrupt(null);
           setConnected(true);
           setStreamingText('');
+          setCliActivity([]);
           break;
 
         case 'RUN_FINISHED':
@@ -127,6 +131,14 @@ export function AgUiTransportProvider({ children }: { children: React.ReactNode 
           setState((prev) => ({ ...prev, status: 'paused' }));
           break;
 
+        case 'CUSTOM': {
+          const entry = d as unknown as CliActivityEntry;
+          if (entry.kind && entry.label) {
+            setCliActivity((prev) => [...prev, entry]);
+          }
+          break;
+        }
+
         default:
           break;
       }
@@ -135,7 +147,7 @@ export function AgUiTransportProvider({ children }: { children: React.ReactNode 
     return cleanup;
   }, []);
 
-  const value: AgUiTransportValue = { state, toolCalls, interrupt, connected, streamingText };
+  const value: AgUiTransportValue = { state, toolCalls, interrupt, connected, streamingText, cliActivity };
 
   return React.createElement(AgUiTransportContext.Provider, { value }, children);
 }
@@ -157,8 +169,8 @@ export function useAgentState() {
   return { state };
 }
 
-/** Tool calls, interrupt, and streaming text — used by AgentChat. */
+/** Tool calls, interrupt, streaming text, and CLI activity — used by AgentChat. */
 export function useAgUiEvents() {
-  const { toolCalls, interrupt, streamingText } = useTransportContext();
-  return { toolCalls, interrupt, streamingText };
+  const { toolCalls, interrupt, streamingText, cliActivity } = useTransportContext();
+  return { toolCalls, interrupt, streamingText, cliActivity };
 }

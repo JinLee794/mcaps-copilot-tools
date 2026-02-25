@@ -4,6 +4,7 @@ import type { McpRegistry } from './mcp-registry';
 import type { SkillsLoader } from './skills-loader';
 import { emitAgUiEvent, resetTranslatorState } from '../ag-ui-translator';
 import { AgUiEventType, createAgUiEvent } from '../../shared/types/AgUiEvent';
+import type { CliActivityKind } from '../../shared/types/AgUiEvent';
 import { CopilotClient, buildToolDefinitions } from '../copilot-client';
 import { SessionRecorder } from '../session-recorder';
 import type { CopilotSession } from '../../shared/types/CopilotSdk';
@@ -14,6 +15,25 @@ let activeSession: CopilotSession | null = null;
 let activeRecorder: SessionRecorder | null = null;
 let copilotClient: CopilotClient | null = null;
 let permissionResolve: ((response: { approved: boolean; edits?: Record<string, unknown> }) => void) | null = null;
+
+function emitCliActivity(
+  window: BrowserWindow,
+  runId: string,
+  kind: CliActivityKind,
+  label: string,
+  detail?: string,
+) {
+  window.webContents.send(
+    'ag-ui:event',
+    createAgUiEvent(AgUiEventType.CUSTOM, runId, {
+      id: `cli-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      kind,
+      label,
+      detail,
+      timestamp: Date.now(),
+    }),
+  );
+}
 
 function getClient(mcpRegistry: McpRegistry): CopilotClient {
   if (!copilotClient) {
@@ -47,11 +67,14 @@ export function registerIpcHandlers(mcpRegistry: McpRegistry, skillsLoader: Skil
       // 1. Load skill definition
       const skill = skillsLoader.getSkill(params.skill);
       const systemPrompt = skill?.rawContent ?? `You are a sales assistant. Run the "${params.skill}" skill.`;
+      emitCliActivity(window, runId, 'skill_loaded', `Skill loaded: ${params.skill}`, systemPrompt.slice(0, 200));
 
       // 2. Build tool definitions from MCP registry
       // If skill has specific tools, use those; otherwise register all
       const allTools = mcpRegistry.getTools().map((t) => t.name);
       const toolDefs = buildToolDefinitions(allTools, mcpRegistry);
+      emitCliActivity(window, runId, 'tool_registered', `${toolDefs.length} tools registered`, allTools.join(', '));
+      emitCliActivity(window, runId, 'context_added', 'System prompt configured');
 
       // 3. Create SDK session
       const session = await client.createSession({
@@ -61,6 +84,7 @@ export function registerIpcHandlers(mcpRegistry: McpRegistry, skillsLoader: Skil
         streaming: true,
       });
       activeSession = session;
+      emitCliActivity(window, runId, 'session_created', `Session created: ${session.id}`);
 
       // 4. Attach SessionRecorder for workflow capture
       const workspaceRoot = mcpRegistry['configPath']
@@ -82,6 +106,18 @@ export function registerIpcHandlers(mcpRegistry: McpRegistry, skillsLoader: Skil
           data: sdkEvent.data,
         }, runId);
 
+        // Forward tool call events as CLI activity entries
+        if (sdkEvent.type === 'tool.request') {
+          emitCliActivity(window, runId, 'tool_invoked',
+            `Calling: ${String(sdkEvent.data['name'] ?? 'unknown')}`,
+            sdkEvent.data['args'] ? JSON.stringify(sdkEvent.data['args']).slice(0, 300) : undefined,
+          );
+        } else if (sdkEvent.type === 'tool.result') {
+          emitCliActivity(window, runId, 'tool_completed',
+            `Completed: ${String(sdkEvent.data['name'] ?? 'unknown')}`,
+          );
+        }
+
         // Handle HITL: if permission.request, pause for user approval
         if (sdkEvent.type === 'permission.request') {
           window.webContents.send('ag-ui:event', createAgUiEvent(AgUiEventType.INTERRUPT, runId, {
@@ -93,6 +129,7 @@ export function registerIpcHandlers(mcpRegistry: McpRegistry, skillsLoader: Skil
       });
 
       // 6. Send the prompt
+      emitCliActivity(window, runId, 'prompt_sent', 'Prompt sent to agent', params.prompt.slice(0, 200));
       await session.send({ prompt: params.prompt });
 
     } catch (err) {
