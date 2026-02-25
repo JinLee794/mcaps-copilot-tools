@@ -115,6 +115,68 @@ For WorkIQ-heavy workflows, Copilot CLI is an ideal integration point to orchest
 - Avoid creating one-off files under `mcp-server/.tmp` for standard read/update flows unless explicitly troubleshooting.
 - For write-intent changes, use role mapping and explicit confirmation gates before execution.
 
+## Obsidian Vault Memory Layer (Optional)
+
+An optional local knowledge layer can be enabled using an Obsidian vault and the [`mcp-obsidian`](https://github.com/mcaps-copilot-tools/mcp-obsidian) MCP server. When configured, the agent prefetches customer/project context from your vault before hitting CRM endpoints, and promotes validated findings back into human-reviewable vault notes.
+
+This is **fully backwards-compatible** — if not configured, all workflows fall back to `.agent-memory/` with zero breakage.
+
+### What it adds
+
+| Capability | Without vault | With vault |
+|---|---|---|
+| Pre-CRM context | Visit-log JSON only | Rich customer profiles, stakeholders, tech stacks, prior findings |
+| Durable findings | `.agent-memory/durable/` JSON files | Vault notes with wiki-links, Dataview queries, graph participation |
+| Human review | Manual JSON inspection | Obsidian search, graph view, backlinks |
+
+### Setup
+
+1. **Clone and build mcp-obsidian** (sibling to this repo):
+
+   ```bash
+   cd ..
+   git clone https://github.com/mcaps-copilot-tools/mcp-obsidian.git
+   cd mcp-obsidian
+   npm install
+   npm run build
+   ```
+
+2. **Prepare your Obsidian vault** with these folders:
+
+   ```
+   Your Vault/
+   ├── Customers/      # One .md per account (Stryker.md, Cencora.md, etc.)
+   ├── Projects/       # One .md per engagement/POC
+   ├── People/         # One .md per contact/stakeholder
+   └── CRM Insights/   # (created automatically on first promotion)
+   ```
+
+3. **Set the vault path** environment variable:
+
+   ```bash
+   export OBSIDIAN_VAULT_PATH="$HOME/Documents/Obsidian/Your Vault Name"
+   ```
+
+4. **Verify the mcp-obsidian entry** in [.vscode/mcp.json](.vscode/mcp.json) — it's pre-configured and reads from `${env:OBSIDIAN_VAULT_PATH}`.
+
+5. **Start the MCP servers** in your editor. The agent will auto-detect whether `mcp-obsidian` is available and use the enhanced retrieval order when it is.
+
+### How it works
+
+The agent retrieval order becomes:
+
+1. **Visit log** (`.agent-memory/working/customer-visit-log.json`) — have I seen this customer recently?
+2. **Vault: Customer file** — team composition, stakeholders, active projects, prior `## Agent Insights`
+3. **Vault: Project files** — tech stack, architecture decisions, target dates
+4. **CRM** (`msx-crm` tools) — live pipeline state, milestones, tasks
+5. **WorkIQ** (`ask_work_iq`) — M365 evidence (meetings, chats, emails)
+
+Steps 1-3 are zero-latency local reads. The agent arrives at CRM already knowing who the people are and what was found last time.
+
+After CRM workflows, validated findings are promoted back to the vault's `## Agent Insights` section on Customer/Project files — creating a persistent, human-reviewable knowledge loop.
+
+For full details, see [vault-memory-layer.instructions.md](.github/instructions/vault-memory-layer.instructions.md).
+
 ## Customization Capabilities
 
 The repository is built for high customization in agent behavior:
