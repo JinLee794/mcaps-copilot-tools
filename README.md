@@ -11,7 +11,7 @@ This repo started as an MSX Helper MCP server and has expanded into a broader op
 
 ## Project Layout
 
-- `mcp-server/` — Node.js MCP server implementation for MSX CRM tools
+- `mcp/msx/` — Node.js MCP server implementation for MSX CRM tools
 - `.github/skills/` — MCAPS role skills and WorkIQ query-scoping skill
 - `.github/instructions/` — role/write-gate operational instructions
 - `docs/` — architecture and supporting documentation
@@ -68,13 +68,13 @@ The repo is designed to automate day-to-day sales workflows by combining systems
 From the repo root:
 
 ```bash
-cd mcp-server
+cd mcp/msx
 npm install
 npm test
 npm start
 ```
 
-## Agentic Frontend (Electron MVP)
+<!-- NOT YET IMPLEMENTED ## Agentic Frontend (Electron MVP)
 
 A local Electron-first frontend now exists under `frontend/` with:
 
@@ -92,7 +92,7 @@ npm install
 npm run dev
 ```
 
-This launches the Electron app and starts orchestration APIs on `http://127.0.0.1:3100`.
+This launches the Electron app and starts orchestration APIs on `http://127.0.0.1:3100`. -->
 
 ### Runtime Notes
 
@@ -113,7 +113,7 @@ az login
 
 ## MCP Integration
 
-This server runs on stdio transport and can be wired into MCP-compatible clients/editors by pointing to the Node entrypoint in `mcp-server/src/index.js` (or the `msx-mcp` binary after package install).
+This server runs on stdio transport and can be wired into MCP-compatible clients/editors by pointing to the Node entrypoint in `mcp/msx/src/index.js` (or the `msx-mcp` binary after package install).
 
 For WorkIQ-heavy workflows, Copilot CLI is an ideal integration point to orchestrate role skills + `msx-crm` + `ask_work_iq` in a single agentic loop.
 
@@ -134,7 +134,7 @@ For WorkIQ-heavy workflows, Copilot CLI is an ideal integration point to orchest
 - Route by system of record:
 	- MSX CRM facts (opportunities, milestones, tasks, ownership, status) → `msx-crm` tools.
 	- M365 collaboration evidence (conversations, meetings, docs, mail) → WorkIQ MCP.
-- Avoid creating one-off files under `mcp-server/.tmp` for standard read/update flows unless explicitly troubleshooting.
+- Avoid creating one-off files under `mcp/msx/.tmp` for standard read/update flows unless explicitly troubleshooting.
 - For write-intent changes, use role mapping and explicit confirmation gates before execution.
 
 ## Customization Capabilities
@@ -168,4 +168,4 @@ Big thanks to the original MSX Helper project for the foundation and inspiration
 
 ## License
 
-MIT (see `mcp-server/package.json`)
+MIT (see `mcp/msx/package.json`)
