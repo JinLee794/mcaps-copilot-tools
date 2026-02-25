@@ -16,7 +16,10 @@ MCAPS Copilot Tools connects GitHub Copilot (in VS Code) to your MSX CRM and Mic
 
 ## Quick Start (5 Minutes)
 
-> **Prerequisites:** [VS Code](https://code.visualstudio.com/) (or VS Code Insiders) with the [GitHub Copilot extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat) installed, [Node.js 18+](https://nodejs.org/), and [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli).
+> **Prerequisites:**
+> - A GitHub Copilot-compatible IDE such as [VS Code](https://code.visualstudio.com/) (or [VS Code Insiders](https://code.visualstudio.com/insiders/)) with the [GitHub Copilot extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat), **or** the [GitHub Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli/installing-github-copilot-in-the-cli)
+> - [Node.js 18+](https://nodejs.org/)
+> - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)
 
 ### Step 1: Clone and install
 
