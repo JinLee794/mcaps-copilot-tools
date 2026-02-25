@@ -9,6 +9,14 @@ applyTo: "mcp-server/**"
   - `crm_auth_status`, `crm_whoami`, `crm_get_record`, `crm_query`, `get_milestones`, `get_milestone_activities`
   - `create_task`, `update_task`, `close_task`, `update_milestone`
 
+## 0) CRM Read Scoping (Required before bulk reads)
+Before calling any CRM read tool that may return large result sets (especially `get_milestones` with `mine: true`):
+1. **Confirm the user's role** (see §1 below).
+2. **Ask at least one scoping question**: which opportunity/customer, which status, what time range, or what specific data is needed.
+3. **Prefer `crm_query`** with `$filter`, `$select`, `$top` for targeted lookups over bulk `get_milestones(mine: true)`.
+4. **Use `get_milestones` with a specific `opportunityId` or `milestoneId`/`milestoneNumber`** when you have the identifier.
+5. Only use `get_milestones(mine: true)` (unfiltered) if the user explicitly requests all milestones and you have warned about volume.
+
 ## 1) Role Resolution (Required before workflow guidance)
 1. Identify current user via `crm_auth_status` (or `crm_whoami`).
 2. Fetch profile data using `crm_get_record` for `systemusers(<userId>)` with available identity fields (for example: name/title/email/business unit).

@@ -1,6 +1,6 @@
 ---
 name: solution-engineer-msx-ops
-description: 'Solution Engineer operating skill for MSX/MCEM focused on day-to-day milestone task updates, BANT-qualified uncommitted handoff, and influenced committed-milestone follow-through.'
+description: 'Solution Engineer operating skill for MSX/MCEM. Drives daily milestone task hygiene, BANT-qualified uncommitted handoff to CSU, and influenced committed-milestone follow-through. Use when user identifies as Solution Engineer or SE, or asks about milestone task updates, BANT readiness, uncommitted handoff preparation, SE-influenced milestone continuity, or technical proof task management.'
 argument-hint: 'Provide opportunity/milestone IDs, commitment state, BANT status, and the outcome needed'
 ---
 
@@ -22,10 +22,17 @@ It standardizes when SE should:
 - Stage 2/3/4 transitions need explicit task ownership and handoff clarity.
 
 ## Runtime Contract
-- Read tools are live: `crm_auth_status`, `crm_whoami`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `crm_get_record`, `crm_query`, `get_task_status_options`.
+- Read tools are live: `crm_auth_status`, `crm_whoami`, `get_my_active_opportunities`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `crm_get_record`, `crm_query`, `get_task_status_options`.
 - Write-intent tools are dry-run: `create_task`, `update_task`, `close_task`, `update_milestone` return `mock: true` previews.
 - No execute/cancel staging endpoints: treat write-tool output as recommended updates.
 - Follow `.github/instructions/msx-role-and-write-gate.instructions.md` for mandatory human confirmation before write-intent operations.
+
+### Upfront Scoping Pattern (minimize context expansion)
+Collect relevant scope in as few calls as possible before branching into per-milestone workflows:
+1. `get_my_active_opportunities()` — one call returns all active opps with customer names (use `customerKeyword` to narrow further).
+2. `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — returns compact grouped output instead of full records.
+3. Only call `get_milestone_activities(milestoneId)` for specific milestones that need investigation (stale, at-risk, or blocked).
+4. Reserve `crm_query` as an escape hatch for ad-hoc OData needs not covered by structured tools.
 
 ## WorkIQ MCP for M365 Evidence
 - Use WorkIQ MCP (`ask_work_iq`) when required context is in Microsoft 365 sources rather than CRM tables.
@@ -98,14 +105,15 @@ Drive technical win quality through disciplined milestone-task management and ti
 
 ## Operating Procedure
 1. Resolve role and scope (`crm_auth_status` + selected role workflow).
-2. Pull milestone set (`get_milestones(opportunityId)`).
-3. Pull activities where progression is unclear (`get_milestone_activities(milestoneId)`).
-4. Perform task hygiene checks for each milestone.
-5. Apply commitment branch policy:
+2. Discover active opportunities: `get_my_active_opportunities()` (or `get_my_active_opportunities({ customerKeyword })` to narrow).
+3. Pull scoped milestone summaries: `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` per opportunity.
+4. Pull activities only for milestones with unclear progression (`get_milestone_activities(milestoneId)`).
+5. Perform task hygiene checks for flagged milestones.
+6. Apply commitment branch policy:
    - uncommitted + BANT-ready => CSU handoff preparation,
    - committed + SE-influenced => task updates continue.
-6. Build dry-run write plan (`create_task`, `update_task`, `close_task`, optional `update_milestone`).
-7. Produce confirmation packet before any write-intent execution.
+7. Build dry-run write plan (`create_task`, `update_task`, `close_task`, optional `update_milestone`).
+8. Produce confirmation packet before any write-intent execution.
 
 ## Guardrails (Pass/Fail)
 ### 1) Task Completeness
@@ -160,11 +168,10 @@ Trigger: weekly cadence or pre-review hygiene pass.
 
 Steps:
 1. `crm_auth_status`
-2. `list_accounts_by_tpid(tpids)` when account scope is needed
-3. `list_opportunities(accountIds)`
-4. `get_milestones(opportunityId)`
-5. `get_milestone_activities(milestoneId)` for unclear progression
-6. `crm_query(...)` only when extra technical fields are required
+2. `get_my_active_opportunities()` — replaces `list_accounts_by_tpid` + `list_opportunities`; returns compact list in one call.
+3. `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — compact grouped output per opportunity; skip completed/closed milestones.
+4. `get_milestone_activities(milestoneId)` — only for milestones flagged as stale, at-risk, or missing tasks.
+5. `crm_query(...)` only when extra technical fields are required.
 
 Decision logic:
 - Flag stale/missing tasks first.
@@ -179,9 +186,9 @@ Output schema:
 Trigger: uncommitted milestone with potential readiness for CSU execution.
 
 Steps:
-1. `get_milestones(opportunityId)` and isolate uncommitted milestones
-2. `get_milestone_activities(milestoneId)` for BANT and readiness evidence
-3. `crm_get_record(entitySet='opportunities', id=opportunityId, select=...)`
+1. `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — compact view; isolate uncommitted milestones from summary.
+2. `get_milestone_activities(milestoneId)` for BANT and readiness evidence (only for target milestones).
+3. `crm_get_record(entitySet='opportunities', id=opportunityId, select=...)` when additional opportunity fields are needed.
 4. Propose dry-run remediation actions:
    - `update_milestone(...)`
    - `create_task(...)`
@@ -201,8 +208,8 @@ Output schema:
 Trigger: committed milestone where SE influence is `yes`.
 
 Steps:
-1. `get_milestones(opportunityId)` and isolate committed milestones influenced by SE
-2. `get_milestone_activities(milestoneId)` for progression and blocker evidence
+1. `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — isolate committed milestones influenced by SE from compact output.
+2. `get_milestone_activities(milestoneId)` for progression and blocker evidence (targeted, not all milestones).
 3. Dry-run updates:
    - `update_task(...)`
    - `create_task(...)`
@@ -225,7 +232,7 @@ Trigger: CRM status is unclear and corroboration is needed from collaboration ar
 Steps:
 1. Build scope (customer, opportunity, people, date range, source types).
 2. Call WorkIQ MCP (`ask_work_iq`) for Teams/meetings/Outlook/SharePoint evidence.
-3. Compare evidence with `get_milestones(...)` and `get_milestone_activities(...)`.
+3. Compare evidence with `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` and `get_milestone_activities(milestoneId)` (targeted only).
 4. Produce a concise `evidence_vs_crm` summary and dry-run remediation proposals if gaps exist.
 
 Output schema:

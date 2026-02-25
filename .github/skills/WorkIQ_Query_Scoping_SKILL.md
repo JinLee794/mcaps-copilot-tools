@@ -13,6 +13,7 @@ Convert broad WorkIQ asks into focused retrieval plans that minimize noise, late
 - Primary retrieval tool: WorkIQ MCP `ask_work_iq`.
 - If EULA is required by environment policy, complete acceptance before retrieval.
 - Keep CRM reads/writes in `msx-crm`; use WorkIQ for M365 evidence retrieval only.
+- **Seed fact map from CRM before retrieval**: call `get_my_active_opportunities(customerKeyword)` to resolve customer/opportunity context and populate entities, then use those names in WorkIQ queries for precise scoping.
 
 ## When to Use
 - User asks for broad retrieval across Microsoft 365 sources (for example meetings + chats + files + emails).
