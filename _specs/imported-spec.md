@@ -222,12 +222,13 @@ sequenceDiagram
     CLI-->>CPK: TEXT_MESSAGE_CONTENT (streaming brief output)
     CPK-->>RC: Output panel streams markdown token-by-token
 
-    alt Human-in-the-Loop — Write Gate (always required for write-intent tools)
-        CLI-->>CPK: INTERRUPT { message: "Review dry-run: update_milestone + create_task?", mock: true, payload: {...} }
-        CPK-->>AC: Approval card rendered (shows view_staged_changes_diff output as before/after table)
-        User->>AC: Reviews dry-run preview, clicks "Approve" or edits
+    alt Human-in-the-Loop — Write Gate (MUST fire BEFORE any write tool invocation)
+        Note over CLI,CPK: Agent constructs before/after from read data + proposed changes
+        CLI-->>CPK: INTERRUPT { message: "Approve write: update_milestone + create_task?", proposed: { milestoneId, forecastComments, ... } }
+        CPK-->>AC: Approval card rendered (agent calls view_staged_changes_diff with before/after objects)
+        User->>AC: Reviews diff preview, clicks "Approve" or edits
         AC->>CPK: Resume signal
-        CPK->>CLI: Continue (user applies change manually in MSX until execute_operation lands)
+        CPK->>CLI: Continue → agent now invokes write tools (live CRM write)
     end
 
     CLI-->>CPK: TEXT_MESSAGE_END
@@ -373,17 +374,23 @@ Inspired directly by the AG-UI Researcher demo's `useCoAgentStateRender` pattern
 │                                                 │               │
 │  ┌───────────────────┐                          │               │
 │  │ 🏢 Milestones     │─────────────────────────►┘               │
-│  │  msp_milestonestatus                                         │
+│  │  msp_milestonenumber                                         │
+│  │  msp_milestonestatus†                                        │
 │  │  msp_monthlyuse ($)                                          │
-│  │  msp_commitmentrec │                                         │
+│  │  msp_commitmentrecommendation†                               │
+│  │  msp_milestonedate                                           │
 │  │  [●●●●○○○○]        │                                         │
 │  └───────────────────┘                                          │
+│  † OData formatted values via @OData.Community.Display.V1       │
+│    .FormattedValue (e.g. "Active", "Committed")                 │
 │                                                                  │
 │  ┌───────────────────┐                                          │
 │  │ 📋 Tasks           │                                          │
 │  │  subject · statuscode                                        │
 │  │  scheduledend (due)                                          │
 │  │  msp_taskcategory  │                                         │
+│  │  _regardingobjectid_value                                    │
+│  │  (ordered: createdon desc)                                   │
 │  │  [●●○○○○○○]        │                                         │
 │  └───────────────────┘                                          │
 │                                                                  │
@@ -393,12 +400,17 @@ Inspired directly by the AG-UI Researcher demo's `useCoAgentStateRender` pattern
 │                                                                  │
 │  # Deal Brief — Acme Corp                                        │◀── Streams token-by-token
 │  **Risk Level:** Medium — procurement blocker confirmed          │    via TEXT_MESSAGE_CONTENT
-│  **Consumed Recurring (ACR):** $420,000                          │    (msp_consumptionconsumedrecurring)
-│  **Sales Play:** `msp_salesplay` value                           │
+│  **ACR:** $420,000 (`msp_consumptionconsumedrecurring`)          │
+│  **Sales Play:** `msp_salesplay`                                 │
+│  **Est. Completion:** `msp_estcompletiondate`                    │
 │  **Champion:** Jane Doe (VP Eng) — engaged, positive            │
-│  **At-Risk Milestones:** 2 of 4 (`msp_milestonestatus`)         │
+│  **Commitment:** 2 uncommitted / 2 committed                    │    (`msp_commitmentrecommendation`†)
+│    (`msp_commitmentrecommendation`†)                             │
+│  **At-Risk Milestones:** 2 of 4 (`msp_milestonestatus`†)        │
+│  **Forecast:** `msp_forecastcomments` excerpt                    │
 │  **Key Signal:** Asked about pricing 3x in last 30 days         │
 │  **Recommended Next Step:** Executive alignment call            │
+│  † = OData formatted values available                            │
 │                                                                  │
 │  > Sources: 7 transcripts · 12 emails · 24 Teams msgs · MSX    │◀── Auto-cited from state
 └──────────────────────────────────────────────────────────────────┘
@@ -417,12 +429,18 @@ useCoAgentStateRender({
       teams={state.teams}
       // MSX/Dynamics 365 sources — typed CRM records (see §7.2.1)
       // opportunities: CrmOpportunity[] (from list_opportunities)
+      //   → opportunityid, name, msp_salesplay, msp_consumptionconsumedrecurring,
+      //     msp_estcompletiondate, _ownerid_value, _parentaccountid_value
       opportunities={state.opportunities}
-      // milestones: CrmMilestone[] (from get_milestones)
-      //   → msp_milestonestatus, msp_monthlyuse, msp_commitmentrecommendation
+      // milestones: CrmMilestone[] (from get_milestones, ordered by msp_milestonedate)
+      //   → msp_milestonenumber ("7-XXXXXXXXX"), msp_name, msp_milestonestatus†,
+      //     msp_monthlyuse, msp_commitmentrecommendation†, msp_milestonedate,
+      //     msp_forecastcomments, msp_forecastcommentsjsonfield
+      //   † OData formatted values available via @OData.Community.Display.V1.FormattedValue
       milestones={state.milestones}
-      // tasks: CrmTask[] (from get_milestone_activities)
-      //   → subject, statuscode, scheduledend, msp_taskcategory
+      // tasks: CrmTask[] (from get_milestone_activities, ordered by createdon desc)
+      //   → activityid, subject, statuscode†, statecode, scheduledend, msp_taskcategory†,
+      //     _regardingobjectid_value (links to parent milestone GUID), description
       tasks={state.tasks}
       // View tool outputs (with renderHints for auto-layout)
       timeline={state.timeline}       // view_milestone_timeline → TimelineData
@@ -548,10 +566,10 @@ Opened via "🔌 MCP Tools" button. Shows which tools from `mcp.json` are active
 │    VIEW: view_milestone_timeline ·                            │
 │          view_opportunity_cost_trend ·                        │
 │          view_staged_changes_diff                             │
-│    WRITE (dry-run): create_task · update_task ·               │
+│    WRITE (live): create_task · update_task ·                  │
 │          close_task · update_milestone                        │
 │    AUTH: crm_login (device-code flow)                         │
-│    ⚠️  Write tools return mock:true previews — HITL required  │
+│    ⚠️  Write tools are LIVE — HITL required BEFORE invocation │
 │                                                               │
 │  ─────────────────────────────────────────────────────────    │
 │  [+ Add MCP Server]            [Test All Tools]               │
@@ -583,21 +601,21 @@ A split-pane editor invoked by "⚙ Edit SKILLS.md". Left pane is the raw markdo
 │                                     │    ✓ msx-crm  (17 tools, STDIO)          │
 │  # Agent Skill Profile              │    ✓ workiq   (ask_work_iq, STDIO)       │
 │  ...                                │                                           │
-│                                     │  write_tools (dry-run only):             │
+│                                     │  write_tools (LIVE — no dry-run):       │
 │  ## Agent Skills (declarative MCP)  │    create_task · update_task ·           │
 │                                     │    close_task · update_milestone         │
-│  ### Skill: "Daily Hygiene"         │    ⚠️  All return mock:true previews      │
-│  Trigger: Daily cadence             │    ⚠️  HITL approval required             │
+│  ### Skill: "Daily Hygiene"         │    ⚠️  Writes execute immediately         │
+│  Trigger: Daily cadence             │    ⚠️  HITL approval required BEFORE call │
 │  Flow:                              │                                           │
 │  1. crm_auth_status                 │  4 declarative flows detected:           │
 │  2. list_accounts_by_tpid →         │  ● Daily Hygiene                         │
 │     list_opportunities              │  ● BANT-to-CSU Handoff                   │
 │  3. get_milestones(oppId)           │  ● Committed Influenced Follow-through   │
 │  4. get_milestone_activities(...)   │  ● M365 Evidence Companion               │
-│  5. update_task/create_task (dry)   │                                           │
+│  5. update_task/create_task (HITL)   │                                           │
 │                                     │  ✓  Valid skill file format              │
 │  Output: task_summary,              │  ✓  Both MCP servers connected           │
-│    dry_run_task_operations          │  ✓  Skill routing ID confirmed           │
+│    proposed_task_operations          │  ✓  Skill routing ID confirmed           │
 │                                     │                                          │
 └─────────────────────────────────────┴──────────────────────────────────────────┘
 ```
@@ -667,11 +685,11 @@ sequenceDiagram
     SERVER-->>MCP_HOST: { milestones: [...] }
     CPK-->>RC: STATE_DELTA { milestones: { count: 4, signals: ["2 at-risk"] } }
 
-    Note over CLI: Write-intent → dry-run → HITL required (write gate)
-    CLI-->>SDK: SDK event: permission.request { tool: "update_milestone", proposed: { milestoneId, forecastComments }, mock: true }
+    Note over CLI: Write-intent → HITL BEFORE invocation (write gate)
+    CLI-->>SDK: SDK event: permission.request { tool: "update_milestone", proposed: { milestoneId, forecastComments } }
     SDK-->>IPC: [translator] → AG-UI: INTERRUPT
     IPC-->>CPK: ag-ui:event INTERRUPT
-    CPK-->>RC: 🟠 Approval card — view_staged_changes_diff preview shown
+    CPK-->>RC: 🟠 Approval card — view_staged_changes_diff(before, after) preview shown
 
     User->>CPK: Clicks "✓ Approve"
     CPK->>IPC: ipcRenderer.invoke("permission:respond", { approved: true })
@@ -742,9 +760,9 @@ argument-hint: <what context the caller must provide>
 
 ### Runtime contract (current server behavior)
 - **Read tools are live** (13 tools): `crm_auth_status`, `crm_whoami`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `crm_get_record`, `crm_query`, `crm_list_entity_properties`, `get_task_status_options`, `view_milestone_timeline`, `view_opportunity_cost_trend`, `view_staged_changes_diff`
-- **Write-intent tools are dry-run** (4 tools): `create_task`, `update_task`, `close_task`, `update_milestone` return `mock: true` preview payloads
+- **Write tools are currently LIVE** (4 tools): `create_task`, `update_task`, `close_task`, `update_milestone` execute real CRM writes (POST/PATCH) immediately — **there is no dry-run mock layer today**
+- **Planned: staged write pattern** (not yet implemented): `STAGED_OPERATIONS.md` defines the target stage→review→execute flow where writes would validate+stage first, return a preview with before-state diff, and wait for explicit `execute_operation`/`cancel_operation` confirmation. Until this lands, write operations require HITL confirmation at the agent/UI layer before the tool is invoked.
 - **Auth tool**: `crm_login` — device-code flow for Azure CLI authentication (call when `crm_auth_status` reports unauthenticated)
-- **Stage/execute tools not yet exposed**: `STAGED_OPERATIONS.md` defines target pattern; `execute_operation`/`cancel_operation` are future work
 
 ### WorkIQ MCP companion (M365 retrieval)
 - Use `ask_work_iq` when evidence lives in M365 collaboration systems
@@ -759,13 +777,13 @@ argument-hint: <what context the caller must provide>
 2. Resolve scope via `list_accounts_by_tpid` → `list_opportunities`
 3. Call `get_milestones(opportunityId)` and filter
 4. Call `get_milestone_activities(milestoneId)` for evidence
-5. Generate dry-run `update_milestone(...)` / `create_task(...)` payloads
+5. Construct preview payloads for `update_milestone(...)` / `create_task(...)` — presented in HITL approval card before live execution
 
 **Decision logic**: ...
 
 **Output schema**:
 - `output_field_1`
-- `dry_run_operations` (preview payloads)
+- `proposed_operations` (preview payloads for HITL approval)
 ```
 
 ### 7.2 The Two MCP Sources Pattern
@@ -775,8 +793,8 @@ Every skill in the repo follows this two-source design principle:
 | Source | MCP Server | Tools | Key Fields Returned | Answers |
 |---|---|---|---|---|
 | MSX / CRM (Read) | `msx-crm` | `crm_query`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `crm_get_record`, `list_accounts_by_tpid`, `crm_list_entity_properties`, `get_task_status_options` | See [7.2.1 CRM Data Dictionary](#721-crm-data-dictionary) | Ownership, status, execution integrity, dates, entity metadata |
-| MSX / CRM (View) | `msx-crm` | `view_milestone_timeline`, `view_opportunity_cost_trend`, `view_staged_changes_diff` | See [7.2.2 View Tool Output Shapes](#722-view-tool-output-shapes) | Timeline visualization, monthly consumption trends, dry-run diff previews |
-| MSX / CRM (Write) | `msx-crm` | `create_task`, `update_task`, `close_task`, `update_milestone` | Write payloads use the same field names as read schemas | Milestone & task CRUD (dry-run, HITL required) |
+| MSX / CRM (View) | `msx-crm` | `view_milestone_timeline`, `view_opportunity_cost_trend`, `view_staged_changes_diff` | See [7.2.2 View Tool Output Shapes](#722-view-tool-output-shapes) | Timeline visualization, monthly consumption trends, before/after diff previews |
+| MSX / CRM (Write) | `msx-crm` | `create_task`, `update_task`, `close_task`, `update_milestone` | Write payloads use the same field names as read schemas. OData bind syntax for lookups: `"ownerid@odata.bind": "/systemusers(guid)"` | Milestone & task CRUD (**LIVE writes** — HITL required BEFORE invocation) |
 | MSX / CRM (Auth) | `msx-crm` | `crm_auth_status`, `crm_whoami`, `crm_login` | `UserId`, `fullname`, `internalemailaddress` | User identity, session health, device-code login |
 | M365 / WorkIQ | `workiq` | `ask_work_iq` | Free-form results from Teams, Outlook, SharePoint, meeting transcripts | Discussion history, decision rationale, meeting/email evidence |
 
@@ -874,6 +892,40 @@ All foreign-key fields follow the pattern `_<fieldname>_value` and resolve to a 
 // Write: "ownerid@odata.bind": "/systemusers(a1b2c3d4-...)"
 ```
 
+##### OData Formatted Value Annotations
+
+The MCP server's CRM client sends `Prefer: odata.include-annotations="*"`, which means all responses include **formatted value annotations** alongside raw integer/code values for OptionSet fields. The annotation key follows the pattern:
+
+```
+<fieldname>@OData.Community.Display.V1.FormattedValue
+```
+
+**Example: Milestone status in a `get_milestones` response:**
+
+```json
+{
+  "msp_milestonestatus": 861980001,
+  "msp_milestonestatus@OData.Community.Display.V1.FormattedValue": "Active",
+  "msp_commitmentrecommendation": 861980000,
+  "msp_commitmentrecommendation@OData.Community.Display.V1.FormattedValue": "Uncommitted",
+  "msp_milestonecategory": 861980002,
+  "msp_milestonecategory@OData.Community.Display.V1.FormattedValue": "Usage"
+}
+```
+
+**UI implication:** The Research Canvas and Output Panel should prefer formatted values for display labels and fall back to raw int codes only when annotations are absent. The `view_milestone_timeline` tool already resolves the formatted status label at the server level (see `msp_milestonestatus@OData.Community.Display.V1.FormattedValue` usage in `tools.js`).
+
+**Fields with formatted values available:**
+
+| Field | Entity | Formatted Value Example |
+|---|---|---|
+| `msp_milestonestatus` | `msp_engagementmilestones` | "Active", "At Risk", "Closed", etc. |
+| `msp_commitmentrecommendation` | `msp_engagementmilestones` | "Uncommitted", "Committed" |
+| `msp_milestonecategory` | `msp_engagementmilestones` | Category label |
+| `statuscode` | `tasks` | "Not Started", "In Progress", "Completed", etc. |
+| `statecode` | `tasks` | "Open", "Completed", "Cancelled" |
+| `msp_taskcategory` | `tasks` | "Workshop", "Demo", "PoC/Pilot", etc. |
+
 ---
 
 #### 7.2.2 View Tool Output Shapes
@@ -942,9 +994,22 @@ These are the exact JSON shapes returned by the three view tools. The `renderHin
 
 ##### `view_staged_changes_diff` → Diff Table (Approval Card)
 
+**Input:** The agent constructs `before` and `after` objects from CRM read data and the proposed change, then passes them as parameters. This tool does *not* read from a staged operations store — it is a pure render utility.
+
+```typescript
+// Agent calls:
+view_staged_changes_diff({
+  before: { msp_forecastcomments: "On track for Q2 delivery", msp_milestonedate: null },
+  after:  { msp_forecastcomments: "At risk — procurement blocker confirmed", msp_milestonedate: "2026-04-15" },
+  context: "optional label"
+})
+```
+
+**Output:**
+
 ```json
 {
-  "context": "staged-op-id or null",
+  "context": "optional label or null",
   "summary": { "changedFieldCount": 2 },
   "rows": [
     {
@@ -1014,9 +1079,9 @@ argument-hint: Provide opportunity/milestone IDs, commitment state, BANT
 3. `get_milestones(opportunityId)` → filter SE-owned + near-term
 4. `get_milestone_activities(milestoneId)` → check for stale tasks
 5. `get_task_status_options()` → get valid status values
-6. Dry-run: `update_task(...)`, `create_task(...)`, `close_task(...)`
+6. HITL-gated: `update_task(...)`, `create_task(...)`, `close_task(...)` — approval card shown before live execution
 
-**Output schema:** `task_summary`, `dry_run_task_operations`, `date_risk_flags`
+**Output schema:** `task_summary`, `proposed_task_operations`, `date_risk_flags`
 
 ---
 
@@ -1030,11 +1095,11 @@ argument-hint: Provide opportunity/milestone IDs, commitment state, BANT
 2. `get_milestones(opportunityId)` for commitment-bound milestones
 3. `get_milestone_activities(milestoneId)` for execution evidence
 4. Validate: delivery motion, environment prerequisites, success metrics
-5. Dry-run: `update_milestone(...)` + `create_task(...)` gap-closure actions
+5. HITL-gated: `update_milestone(...)` + `create_task(...)` gap-closure actions — approval card shown before live execution
 
 **Decision logic:** Block readiness if any non-negotiable metadata is missing. Mark `ready_for_commit` only when CSA confirmation + all metadata are present.
 
-**Output schema:** `readiness_gate_status`, `missing_requirements`, `dry_run_gate_closures`
+**Output schema:** `readiness_gate_status`, `missing_requirements`, `proposed_gate_closures`
 
 ---
 
@@ -1043,15 +1108,21 @@ argument-hint: Provide opportunity/milestone IDs, commitment state, BANT
 Write-intent operations follow a mandatory two-phase pattern across all roles. The `view_staged_changes_diff` tool renders a before/after comparison table for human review:
 
 ```
-Phase 1 — DRY RUN:
-  Agent calls create_task/update_task/update_milestone
-  → Server returns mock: true preview payload
-  → HITL interrupt fires
-  → Approval card shown in Agent Chat with full diff
+Phase 1 — PREVIEW (UI-layer gate, BEFORE tool invocation):
+  Agent reads current CRM state via read tools (get_milestones, etc.)
+  Agent constructs proposed changes as before/after objects
+  Agent calls view_staged_changes_diff(before, after) for diff preview
+  → HITL interrupt fires in Electron UI
+  → Approval card shown in Agent Chat with full diff table
 
-Phase 2 — EXECUTE (future):
-  User approves → execute_operation(staged_op_id)
-  [Currently: user approves then manually applies in MSX]
+Phase 2 — EXECUTE (on user approval):
+  User approves → agent invokes write tool (create_task/update_task/
+  update_milestone/close_task) → LIVE CRM PATCH/POST executed
+
+Phase 3 — STAGED PATTERN (planned, not yet implemented):
+  STAGED_OPERATIONS.md defines target server-side stage→review→execute
+  flow with execute_operation/cancel_operation. Until implemented,
+  Phase 1 UI-layer gate is the sole safety mechanism.
 ```
 
 This is the "write gate" defined in `.github/instructions/msx-role-and-write-gate.instructions.md`. The Electron UI's approval card should render the `view_staged_changes_diff` output as a before/after table before the user confirms.
@@ -1101,10 +1172,13 @@ interface CrmMilestone {
   msp_name: string;
   _msp_workloadlkid_value: string | null;
   msp_commitmentrecommendation: number;     // option set int
+  'msp_commitmentrecommendation@OData.Community.Display.V1.FormattedValue'?: string; // e.g. "Uncommitted", "Committed"
   msp_milestonecategory: number;            // option set int
+  'msp_milestonecategory@OData.Community.Display.V1.FormattedValue'?: string;
   msp_monthlyuse: number | null;            // $ planned monthly use
   msp_milestonedate: string;                // ISO date
   msp_milestonestatus: number;              // option set int
+  'msp_milestonestatus@OData.Community.Display.V1.FormattedValue'?: string; // e.g. "Active", "At Risk"
   _ownerid_value: string;                   // system user GUID
   _msp_opportunityid_value: string;         // opportunity GUID
   msp_forecastcomments: string | null;
@@ -1117,10 +1191,13 @@ interface CrmTask {
   subject: string;
   scheduledend: string | null;              // ISO date (due date)
   statuscode: number;                       // status reason int
+  'statuscode@OData.Community.Display.V1.FormattedValue'?: string; // e.g. "Not Started", "In Progress"
   statecode: number;                        // 0=Open, 1=Completed, 2=Cancelled
   _ownerid_value: string;                   // system user GUID
+  _regardingobjectid_value: string;         // parent milestone GUID (links task → milestone)
   description: string | null;
   msp_taskcategory: number | null;          // task category code (see §7.2.1)
+  'msp_taskcategory@OData.Community.Display.V1.FormattedValue'?: string; // e.g. "Workshop", "Demo"
 }
 
 /** Account record from list_accounts_by_tpid */
@@ -1246,7 +1323,7 @@ interface SalesAgentState {
     status: "streaming" | "complete";
   };
 
-  // HITL state — dry-run preview for write-intent tools
+  // HITL state — approval preview before live write-intent tool execution
   interrupt?: {
     message: string;
     toolName: string;                // "update_milestone" | "create_task" | "update_task" | "close_task"
@@ -1313,7 +1390,7 @@ User clicks "⚙ Edit SKILLS.md" in existing skill
 Agent finishes research → proposes milestone forecast comment update + follow-up task
 → INTERRUPT event fires → Approval Card appears in Agent Chat
 → "I'd like to update forecast comments on milestone 7-123456789 and create a follow-up task"
-→ User clicks "✎ Edit" → sees dry-run preview (view_staged_changes_diff output)
+→ User clicks "✎ Edit" → sees HITL diff preview (view_staged_changes_diff output)
 → Modifies forecast comments text, clicks Approve
 → Agent resumes → calls update_milestone + create_task MCP tools
 → Tool call log shows ✓ update_milestone 0.4s · ✓ create_task 0.3s
@@ -1440,7 +1517,7 @@ Both MCP servers in `.vscode/mcp.json` use STDIO transport. The `msx-crm` server
 
 **Write gate is non-negotiable**
 
-All write-intent tools (`create_task`, `update_task`, `close_task`, `update_milestone`) return `mock: true` preview payloads. The Electron UI's HITL approval card must render the full proposed payload as a human-readable diff before any confirmation. The future `execute_operation`/`cancel_operation` staged execution pattern (documented in `STAGED_OPERATIONS.md`) is not yet implemented — approvals currently mean the user applies the change manually in MSX.
+All write-intent tools (`create_task`, `update_task`, `close_task`, `update_milestone`) currently execute **live CRM writes** (POST/PATCH) — there is no server-side dry-run mock layer today. The Electron UI **must** implement HITL approval at the agent layer *before* invoking any write tool — not after. The approval card should use `view_staged_changes_diff` (passing constructed `before`/`after` objects as input parameters) to render a human-readable diff preview. The planned `execute_operation`/`cancel_operation` staged execution pattern (documented in `STAGED_OPERATIONS.md`) will move the safety gate server-side; until then, the UI layer is the sole write gate.
 
 **Tiered context loading (Copilot-native)**
 
@@ -1953,10 +2030,10 @@ This section provides a complete reference of all declarative MCP flows defined 
 
 | Skill | Trigger | Key MCP Tools | Output Schema |
 |---|---|---|---|
-| **Daily Hygiene** | Daily cadence | `crm_auth_status`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `get_task_status_options`, `update_task`, `create_task`, `close_task` (dry-run) | `task_summary`, `dry_run_task_operations`, `date_risk_flags` |
-| **BANT-to-CSU Handoff** | Uncommitted milestone + BANT-qualified signals found | `get_milestones`, `get_milestone_activities`, `ask_work_iq` (BANT evidence), `create_task` (dry-run handoff tasks) | `bant_status`, `dry_run_updates`, `csu_handoff_packet` |
-| **Committed Influenced Follow-through** | Committed milestone with SE influence flag, no recent activity | `get_milestones`, `get_milestone_activities`, `update_task` / `create_task` (dry-run) | `influence_gap_report`, `follow_through_actions` |
-| **M365 Evidence Companion** | Proof/PoC milestone exists, evidence not in CRM | `ask_work_iq` (scoped to customer, meeting/Teams/Outlook), `get_milestones`, `get_milestone_activities`, `update_milestone` (dry-run) | `evidence_summary`, `crm_gap_map`, `dry_run_milestone_updates` |
+| **Daily Hygiene** | Daily cadence | `crm_auth_status`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `get_task_status_options`, `update_task`, `create_task`, `close_task` (HITL-gated) | `task_summary`, `proposed_task_operations`, `date_risk_flags` |
+| **BANT-to-CSU Handoff** | Uncommitted milestone + BANT-qualified signals found | `get_milestones`, `get_milestone_activities`, `ask_work_iq` (BANT evidence), `create_task` (HITL-gated handoff tasks) | `bant_status`, `proposed_updates`, `csu_handoff_packet` |
+| **Committed Influenced Follow-through** | Committed milestone with SE influence flag, no recent activity | `get_milestones`, `get_milestone_activities`, `update_task` / `create_task` (HITL-gated) | `influence_gap_report`, `follow_through_actions` |
+| **M365 Evidence Companion** | Proof/PoC milestone exists, evidence not in CRM | `ask_work_iq` (scoped to customer, meeting/Teams/Outlook), `get_milestones`, `get_milestone_activities`, `update_milestone` (HITL-gated) | `evidence_summary`, `crm_gap_map`, `proposed_milestone_updates` |
 
 ---
 
@@ -1964,16 +2041,16 @@ This section provides a complete reference of all declarative MCP flows defined 
 
 | Skill | Trigger | Key MCP Tools | Output Schema |
 |---|---|---|---|
-| **Committed Milestone Execution Monitor** | Daily/weekly sweep | `crm_auth_status`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (dry-run) | `risk_dashboard`, `remediation_plan`, `dry_run_operations` |
-| **Stage 4-5 Value Realization Pack** | Opportunity enters Realize Value / Manage & Optimize | `crm_get_record`, `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (dry-run) | `value_checklist`, `measurement_plan`, `csam_ready_summary`, `dry_run_gap_fixes` |
-| **Architecture-to-Execution Handoff Note** | Proof complete or commitment flips uncommitted → committed | `get_milestones`, `get_milestone_activities`, `crm_query`, `create_task` (dry-run) | `architecture_summary`, `constraints`, `deliverables`, `risks`, `success_metrics`, `next_actions` |
-| **Execution Readiness vs Delivery Ownership Disambiguator** | CSA listed as owner, delivery motion is Partner/ISD/Unified | `get_milestones`, `crm_query`, `update_milestone`, `create_task` (dry-run) | `boundary_mismatch_report`, `role_clarification_actions`, `dry_run_reassignments` |
-| **Stage 4 Readiness Gatekeeper** | Opportunity approaching commitment → Stage 4 | `crm_get_record`, `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (dry-run) | `readiness_gate_status`, `missing_requirements`, `dry_run_gate_closures` |
-| **Unified Readiness Early Warning** | Milestones include Unified-dependent execution paths | `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (dry-run) | `unified_dependency_report`, `timeline_impact_summary`, `dry_run_early_warning_actions` |
-| **Technical Truth vs Admin Noise Filter** | CSA receives milestone alerts with mixed tech/admin actions | `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (dry-run) | `alert_classification`, `csa_action_set` |
-| **M365 Execution Evidence Correlator** | Proof of execution needed beyond CRM comments | `ask_work_iq`, `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (dry-run) | `m365_evidence_map`, `execution_integrity_findings`, `dry_run_corrections`, `reroute_action_set` |
-| **Escalation Classification Assistant** | Execution issue escalated to CSA, routing unclear | `get_milestones`, `get_milestone_activities`, `crm_query`, `create_task` (dry-run) | `issue_type`, `recommended_owner`, `dry_run_routing_tasks` |
-| **Expansion Signal Router** | Stage 5 optimization insights may imply expansion | `get_milestones`, `get_milestone_activities`, `create_task`, `update_milestone` (dry-run) | `expansion_signal_log`, `owner_routing_plan`, `dry_run_signal_tasks` |
+| **Committed Milestone Execution Monitor** | Daily/weekly sweep | `crm_auth_status`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (HITL-gated) | `risk_dashboard`, `remediation_plan`, `proposed_operations` |
+| **Stage 4-5 Value Realization Pack** | Opportunity enters Realize Value / Manage & Optimize | `crm_get_record`, `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (HITL-gated) | `value_checklist`, `measurement_plan`, `csam_ready_summary`, `proposed_gap_fixes` |
+| **Architecture-to-Execution Handoff Note** | Proof complete or commitment flips uncommitted → committed | `get_milestones`, `get_milestone_activities`, `crm_query`, `create_task` (HITL-gated) | `architecture_summary`, `constraints`, `deliverables`, `risks`, `success_metrics`, `next_actions` |
+| **Execution Readiness vs Delivery Ownership Disambiguator** | CSA listed as owner, delivery motion is Partner/ISD/Unified | `get_milestones`, `crm_query`, `update_milestone`, `create_task` (HITL-gated) | `boundary_mismatch_report`, `role_clarification_actions`, `proposed_reassignments` |
+| **Stage 4 Readiness Gatekeeper** | Opportunity approaching commitment → Stage 4 | `crm_get_record`, `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (HITL-gated) | `readiness_gate_status`, `missing_requirements`, `proposed_gate_closures` |
+| **Unified Readiness Early Warning** | Milestones include Unified-dependent execution paths | `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (HITL-gated) | `unified_dependency_report`, `timeline_impact_summary`, `proposed_early_warning_actions` |
+| **Technical Truth vs Admin Noise Filter** | CSA receives milestone alerts with mixed tech/admin actions | `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (HITL-gated) | `alert_classification`, `csa_action_set` |
+| **M365 Execution Evidence Correlator** | Proof of execution needed beyond CRM comments | `ask_work_iq`, `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (HITL-gated) | `m365_evidence_map`, `execution_integrity_findings`, `proposed_corrections`, `reroute_action_set` |
+| **Escalation Classification Assistant** | Execution issue escalated to CSA, routing unclear | `get_milestones`, `get_milestone_activities`, `crm_query`, `create_task` (HITL-gated) | `issue_type`, `recommended_owner`, `proposed_routing_tasks` |
+| **Expansion Signal Router** | Stage 5 optimization insights may imply expansion | `get_milestones`, `get_milestone_activities`, `create_task`, `update_milestone` (HITL-gated) | `expansion_signal_log`, `owner_routing_plan`, `proposed_signal_tasks` |
 
 ---
 
@@ -1981,16 +2058,16 @@ This section provides a complete reference of all declarative MCP flows defined 
 
 | Skill | Trigger | Key MCP Tools | Output Schema |
 |---|---|---|---|
-| **Delivery Accountability Mapper** | CSAM tagged as owner for delivery execution delays | `get_milestones`, `crm_query`, `get_milestone_activities`, `update_milestone` (dry-run) | `accountability_mismatches`, `owner_of_execution_map`, `recommended_owner_corrections` |
-| **Commit Gate Enforcer (CSU)** | Milestone status proposed for `committed` | `get_milestones`, `crm_query`, `create_task`, `update_milestone` (dry-run) | `commit_readiness_result`, `missing_readiness_evidence`, `gate_remediation_actions` |
-| **Execution Authority Clarifier** | Conflicting guidance between CSAM and CSA | `get_milestone_activities`, `crm_query`, `update_milestone` (dry-run) | `authority_conflicts`, `tie_break_decisions`, `communication_plan_notes` |
-| **Unified Constraint Early Warning (CSAM)** | Unified-dependent milestones near-term or newly committed | `get_milestones`, `crm_query`, `create_task` (dry-run) | `unified_readiness_warnings`, `customer_expectation_risks`, `escalation_actions` |
-| **Expansion Ownership Router** | Expansion signal during delivery/adoption execution | `list_opportunities`, `get_milestones`, `crm_query`, `create_task` (dry-run) | `expansion_signals`, `ownership_route`, `alignment_tasks` |
-| **MSX Noise Suppression for CSAM** | High alert volume obscures customer-impact risks | `get_milestones`, `get_milestone_activities`, `crm_query`, `create_task`, `update_task` (dry-run) | `csam_action_queue`, `reroute_queue`, `noise_reduction_summary` |
-| **Committed Milestone Health Review** | Weekly governance cycle | `crm_auth_status`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (dry-run) | `health_report`, `customer_summary`, `internal_summary`, `dry_run_updates` |
-| **Customer Success Plan → MSX Alignment** | QBR or success plan refresh | `list_opportunities`, `get_milestones`, `crm_query`, `update_milestone`, `create_task` (dry-run) | `alignment_matrix` |
-| **Customer Communication Evidence Pack (WorkIQ)** | CSAM needs customer-facing evidence for risk/adoption updates | `ask_work_iq`, `get_milestones`, `get_milestone_activities`, `create_task`, `update_milestone` (dry-run) | `m365_customer_signals`, `crm_execution_state`, `customer_message_bullets`, `dry_run_followups`, `gaps`, `recommended_msx_changes` |
-| **Usage/Adoption Excellence Coordination** | Adoption milestone created or usage intent increases | `get_milestones`, `get_milestone_activities`, `get_task_status_options`, `create_task`, `update_task`, `close_task` (dry-run) | `orchestration_note`, `action_list`, `task_operation_previews` |
+| **Delivery Accountability Mapper** | CSAM tagged as owner for delivery execution delays | `get_milestones`, `crm_query`, `get_milestone_activities`, `update_milestone` (HITL-gated) | `accountability_mismatches`, `owner_of_execution_map`, `recommended_owner_corrections` |
+| **Commit Gate Enforcer (CSU)** | Milestone status proposed for `committed` | `get_milestones`, `crm_query`, `create_task`, `update_milestone` (HITL-gated) | `commit_readiness_result`, `missing_readiness_evidence`, `gate_remediation_actions` |
+| **Execution Authority Clarifier** | Conflicting guidance between CSAM and CSA | `get_milestone_activities`, `crm_query`, `update_milestone` (HITL-gated) | `authority_conflicts`, `tie_break_decisions`, `communication_plan_notes` |
+| **Unified Constraint Early Warning (CSAM)** | Unified-dependent milestones near-term or newly committed | `get_milestones`, `crm_query`, `create_task` (HITL-gated) | `unified_readiness_warnings`, `customer_expectation_risks`, `escalation_actions` |
+| **Expansion Ownership Router** | Expansion signal during delivery/adoption execution | `list_opportunities`, `get_milestones`, `crm_query`, `create_task` (HITL-gated) | `expansion_signals`, `ownership_route`, `alignment_tasks` |
+| **MSX Noise Suppression for CSAM** | High alert volume obscures customer-impact risks | `get_milestones`, `get_milestone_activities`, `crm_query`, `create_task`, `update_task` (HITL-gated) | `csam_action_queue`, `reroute_queue`, `noise_reduction_summary` |
+| **Committed Milestone Health Review** | Weekly governance cycle | `crm_auth_status`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `get_milestone_activities`, `update_milestone`, `create_task` (HITL-gated) | `health_report`, `customer_summary`, `internal_summary`, `proposed_updates` |
+| **Customer Success Plan → MSX Alignment** | QBR or success plan refresh | `list_opportunities`, `get_milestones`, `crm_query`, `update_milestone`, `create_task` (HITL-gated) | `alignment_matrix` |
+| **Customer Communication Evidence Pack (WorkIQ)** | CSAM needs customer-facing evidence for risk/adoption updates | `ask_work_iq`, `get_milestones`, `get_milestone_activities`, `create_task`, `update_milestone` (HITL-gated) | `m365_customer_signals`, `crm_execution_state`, `customer_message_bullets`, `proposed_followups`, `gaps`, `recommended_msx_changes` |
+| **Usage/Adoption Excellence Coordination** | Adoption milestone created or usage intent increases | `get_milestones`, `get_milestone_activities`, `get_task_status_options`, `create_task`, `update_task`, `close_task` (HITL-gated) | `orchestration_note`, `action_list`, `task_operation_previews` |
 
 ---
 
@@ -1999,8 +2076,8 @@ This section provides a complete reference of all declarative MCP flows defined 
 | Skill | Trigger | Key MCP Tools | Output Schema |
 |---|---|---|---|
 | **Stage 2-3 Pipeline Builder** | New customer signal or net-new project in Specialist scope | `crm_auth_status`, `list_accounts_by_tpid`, `list_opportunities`, `get_milestones`, `crm_query` | `scope`, `findings`, `recommended_actions` |
-| **Handoff Readiness Check** | Customer agreement reached or commitment flips to committed | `get_milestones`, `get_milestone_activities`, `crm_get_record`, `create_task` (dry-run) | `ready`, `blocking_gaps`, `handoff_note`, `draft_tasks` |
-| **Pipeline Hygiene Exceptions Triage** | Weekly cadence or hygiene alert | `list_opportunities`, `get_milestones`, `get_milestone_activities`, `update_milestone`, `update_task` (dry-run) | `exceptions`, `proposed_field_updates`, `escalation_path` |
+| **Handoff Readiness Check** | Customer agreement reached or commitment flips to committed | `get_milestones`, `get_milestone_activities`, `crm_get_record`, `create_task` (HITL-gated) | `ready`, `blocking_gaps`, `handoff_note`, `draft_tasks` |
+| **Pipeline Hygiene Exceptions Triage** | Weekly cadence or hygiene alert | `list_opportunities`, `get_milestones`, `get_milestone_activities`, `update_milestone`, `update_task` (HITL-gated) | `exceptions`, `proposed_field_updates`, `escalation_path` |
 | **Stage 2 Signal Intake (WorkIQ)** | New opportunity signal scattered across M365 | `ask_work_iq`, `list_opportunities`, `get_milestones` | `signal_summary`, `crm_gap_map`, `recommended_orchestration_actions` |
 
 ---
