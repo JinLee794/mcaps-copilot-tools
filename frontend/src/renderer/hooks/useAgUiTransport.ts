@@ -75,7 +75,7 @@ export function AgUiTransportProvider({ children }: { children: React.ReactNode 
           break;
 
         case 'TEXT_MESSAGE_CONTENT': {
-          const delta = String(d['delta'] ?? '');
+          const delta = String(d['content'] ?? d['delta'] ?? '');
           setState((prev) => ({
             ...prev,
             output: {
@@ -96,10 +96,11 @@ export function AgUiTransportProvider({ children }: { children: React.ReactNode 
 
         case 'TOOL_CALL_START': {
           const entry: ToolCallEntry = {
-            id: String(d['toolCallId'] ?? `tc-${Date.now()}`),
-            name: String(d['name'] ?? 'unknown'),
-            server: String(d['server'] ?? 'msx-crm'),
+            id: String(d['callId'] ?? d['toolCallId'] ?? `tc-${Date.now()}`),
+            name: String(d['toolName'] ?? d['name'] ?? 'unknown'),
+            server: String(d['server'] ?? ''),
             status: 'pending',
+            args: (d['args'] ?? undefined) as Record<string, unknown> | undefined,
             timestamp: new Date(),
           };
           setToolCalls((prev) => [...prev, entry]);
@@ -107,11 +108,12 @@ export function AgUiTransportProvider({ children }: { children: React.ReactNode 
         }
 
         case 'TOOL_CALL_END': {
-          const callId = String(d['toolCallId'] ?? '');
+          const callId = String(d['callId'] ?? d['toolCallId'] ?? '');
+          const status = d['status'] === 'error' ? 'error' as const : 'success' as const;
           setToolCalls((prev) =>
             prev.map((tc) =>
               tc.id === callId
-                ? { ...tc, status: 'success' as const, result: d['result'] }
+                ? { ...tc, status, result: d['result'] }
                 : tc,
             ),
           );
@@ -120,6 +122,10 @@ export function AgUiTransportProvider({ children }: { children: React.ReactNode 
 
         case 'STATE_DELTA':
           setState((prev) => ({ ...prev, ...d as Partial<SalesAgentState> }));
+          // If status changed away from 'paused', clear the interrupt card
+          if ((d as Partial<SalesAgentState>).status && (d as Partial<SalesAgentState>).status !== 'paused') {
+            setInterrupt(null);
+          }
           break;
 
         case 'STATE_SNAPSHOT':

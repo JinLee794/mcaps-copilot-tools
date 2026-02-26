@@ -1,7 +1,7 @@
 import { c as createAgUiEvent, A as AgUiEventType } from "../index.js";
 import "electron";
 import "path";
-import "child_process";
+import "@github/copilot-sdk";
 import "fs/promises";
 import "fs";
 import __cjs_mod__ from "node:module";
@@ -33,9 +33,7 @@ class WorkflowRunner {
           proposedArgs: {}
         }));
         const approved = await this.waitForApproval();
-        if (!approved) {
-          break;
-        }
+        if (!approved) break;
       }
       if (step.type === "mcp_tool") {
         const result = await this.executeMcpStep(step, params, stepResults, runId, window);
@@ -74,13 +72,21 @@ class WorkflowRunner {
     }));
     const startTime = Date.now();
     try {
-      const { invokeMcpToolDirect } = await import("../index.js").then((n) => n.a);
-      const result = await Promise.race([
-        invokeMcpToolDirect(step.tool, resolvedArgs, this.mcpRegistry),
+      const session = await this.client.createSession({
+        systemMessage: {
+          mode: "replace",
+          content: `You MUST call the tool "${step.tool}" with exactly these arguments: ${JSON.stringify(resolvedArgs)}. Do not call any other tools. Do not add commentary.`
+        },
+        streaming: false
+      });
+      const response = await Promise.race([
+        session.sendAndWait({ prompt: `Call ${step.tool}` }),
         new Promise(
           (_, reject) => setTimeout(() => reject(new Error("timeout")), step.timeout)
         )
       ]);
+      await session.destroy();
+      const result = response ?? null;
       const durationMs = Date.now() - startTime;
       window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.TOOL_CALL_END, runId, {
         toolName: step.tool,
@@ -99,9 +105,7 @@ class WorkflowRunner {
         status: "error",
         durationMs
       }));
-      if (step.onError === "abort") {
-        throw err;
-      }
+      if (step.onError === "abort") throw err;
       return void 0;
     }
   }
@@ -119,36 +123,39 @@ class WorkflowRunner {
       }
     }
     const session = await this.client.createSession({
-      model: "gpt-4.5",
-      systemMessage: `You are generating a ${step.outputFormat} output using the template: ${step.template}`,
-      tools: [],
+      systemMessage: {
+        mode: "append",
+        content: `You are generating a ${step.outputFormat} output using the template: ${step.template}`
+      },
       streaming: true
     });
     let output = "";
-    session.on((event) => {
-      if (event.type === "assistant.message_start") {
-        window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.TEXT_MESSAGE_START, runId, {
-          messageId: `wf-synth-${step.id}`,
-          role: "assistant"
-        }));
-      } else if (event.type === "assistant.message_delta") {
-        const content = event.data["content"] ?? "";
-        output += content;
-        window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.TEXT_MESSAGE_CONTENT, runId, {
-          messageId: `wf-synth-${step.id}`,
-          delta: content
-        }));
-      } else if (event.type === "assistant.message_end") {
-        window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.TEXT_MESSAGE_END, runId, {
-          messageId: `wf-synth-${step.id}`
-        }));
-      }
+    const messageId = `wf-synth-${step.id}`;
+    session.on("assistant.turn_start", () => {
+      window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.TEXT_MESSAGE_START, runId, {
+        messageId,
+        role: "assistant"
+      }));
     });
-    await session.send({
+    session.on("assistant.message_delta", (event) => {
+      const content = event.data.deltaContent;
+      output += content;
+      window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.TEXT_MESSAGE_CONTENT, runId, {
+        messageId,
+        delta: content
+      }));
+    });
+    session.on("assistant.turn_end", () => {
+      window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.TEXT_MESSAGE_END, runId, {
+        messageId
+      }));
+    });
+    await session.sendAndWait({
       prompt: `Generate the ${step.template} output from this data:
 
 ${JSON.stringify(inputData, null, 2)}`
     });
+    await session.destroy();
     return output;
   }
   /**

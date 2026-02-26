@@ -1,7 +1,8 @@
 // WorkflowRunner — deterministic replay engine (§13.6)
 //
-// Executes a CapturedWorkflow directly, bypassing Copilot CLI for
-// mcp_tool steps. Only the llm_synthesize step uses a CopilotClient session.
+// Executes a CapturedWorkflow. MCP tool steps are executed by sending
+// a constrained prompt to a CopilotSession (the CLI manages MCP servers).
+// LLM synthesis steps use a dedicated session for open-ended generation.
 // Emits the same AG-UI events as Explore mode so the UI is identical.
 
 import { BrowserWindow } from 'electron';
@@ -58,12 +59,8 @@ export class WorkflowRunner {
           proposedArgs: {},
         }));
 
-        // Wait for user approval via IPC — handled by copilot-handlers
         const approved = await this.waitForApproval();
-        if (!approved) {
-          // User rejected — skip remaining steps
-          break;
-        }
+        if (!approved) break;
       }
 
       if (step.type === 'mcp_tool') {
@@ -106,10 +103,8 @@ export class WorkflowRunner {
     runId: string,
     window: BrowserWindow,
   ): Promise<unknown> {
-    // Resolve template variables in args
     const resolvedArgs = this.resolveArgs(step.args, params, stepResults);
 
-    // Emit TOOL_CALL_START
     const callId = `wf-${step.id}`;
     window.webContents.send('ag-ui:event', createAgUiEvent(AgUiEventType.TOOL_CALL_START, runId, {
       toolName: step.tool,
@@ -120,15 +115,25 @@ export class WorkflowRunner {
     const startTime = Date.now();
 
     try {
-      // Direct MCP invocation via registry
-      const { invokeMcpToolDirect } = await import('./copilot-client.js');
-      const result = await Promise.race([
-        invokeMcpToolDirect(step.tool, resolvedArgs, this.mcpRegistry),
-        new Promise((_, reject) =>
+      // Use a constrained session to invoke the tool via the CLI
+      const session = await this.client.createSession({
+        systemMessage: {
+          mode: 'replace',
+          content: `You MUST call the tool "${step.tool}" with exactly these arguments: ${JSON.stringify(resolvedArgs)}. Do not call any other tools. Do not add commentary.`,
+        },
+        streaming: false,
+      });
+
+      const response = await Promise.race([
+        session.sendAndWait({ prompt: `Call ${step.tool}` }),
+        new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('timeout')), step.timeout),
         ),
       ]);
 
+      await session.destroy();
+
+      const result = response ?? null;
       const durationMs = Date.now() - startTime;
       window.webContents.send('ag-ui:event', createAgUiEvent(AgUiEventType.TOOL_CALL_END, runId, {
         toolName: step.tool,
@@ -149,10 +154,7 @@ export class WorkflowRunner {
         durationMs,
       }));
 
-      if (step.onError === 'abort') {
-        throw err;
-      }
-      // 'skip' — continue to next step
+      if (step.onError === 'abort') throw err;
       return undefined;
     }
   }
@@ -163,10 +165,8 @@ export class WorkflowRunner {
     runId: string,
     window: BrowserWindow,
   ): Promise<string> {
-    // Gather inputs from previous step results
     const inputData: Record<string, unknown> = {};
     for (const inputRef of step.inputs) {
-      // inputRef format: "step_id.field" or just "step_id"
       const dotIdx = inputRef.indexOf('.');
       const stepId = dotIdx >= 0 ? inputRef.slice(0, dotIdx) : inputRef;
       const field = dotIdx >= 0 ? inputRef.slice(dotIdx + 1) : undefined;
@@ -179,40 +179,44 @@ export class WorkflowRunner {
       }
     }
 
-    // Use CopilotClient session for synthesis
     const session = await this.client.createSession({
-      model: 'gpt-4.5',
-      systemMessage: `You are generating a ${step.outputFormat} output using the template: ${step.template}`,
-      tools: [],
+      systemMessage: {
+        mode: 'append',
+        content: `You are generating a ${step.outputFormat} output using the template: ${step.template}`,
+      },
       streaming: true,
     });
 
     let output = '';
+    const messageId = `wf-synth-${step.id}`;
 
-    session.on((event) => {
-      if (event.type === 'assistant.message_start') {
-        window.webContents.send('ag-ui:event', createAgUiEvent(AgUiEventType.TEXT_MESSAGE_START, runId, {
-          messageId: `wf-synth-${step.id}`,
-          role: 'assistant',
-        }));
-      } else if (event.type === 'assistant.message_delta') {
-        const content = (event.data['content'] as string) ?? '';
-        output += content;
-        window.webContents.send('ag-ui:event', createAgUiEvent(AgUiEventType.TEXT_MESSAGE_CONTENT, runId, {
-          messageId: `wf-synth-${step.id}`,
-          delta: content,
-        }));
-      } else if (event.type === 'assistant.message_end') {
-        window.webContents.send('ag-ui:event', createAgUiEvent(AgUiEventType.TEXT_MESSAGE_END, runId, {
-          messageId: `wf-synth-${step.id}`,
-        }));
-      }
+    session.on('assistant.turn_start', () => {
+      window.webContents.send('ag-ui:event', createAgUiEvent(AgUiEventType.TEXT_MESSAGE_START, runId, {
+        messageId,
+        role: 'assistant',
+      }));
     });
 
-    await session.send({
+    session.on('assistant.message_delta', (event) => {
+      const content = event.data.deltaContent;
+      output += content;
+      window.webContents.send('ag-ui:event', createAgUiEvent(AgUiEventType.TEXT_MESSAGE_CONTENT, runId, {
+        messageId,
+        delta: content,
+      }));
+    });
+
+    session.on('assistant.turn_end', () => {
+      window.webContents.send('ag-ui:event', createAgUiEvent(AgUiEventType.TEXT_MESSAGE_END, runId, {
+        messageId,
+      }));
+    });
+
+    await session.sendAndWait({
       prompt: `Generate the ${step.template} output from this data:\n\n${JSON.stringify(inputData, null, 2)}`,
     });
 
+    await session.destroy();
     return output;
   }
 
@@ -229,10 +233,8 @@ export class WorkflowRunner {
     for (const [key, value] of Object.entries(args)) {
       if (typeof value === 'string') {
         resolved[key] = value.replace(/\{\{([^}]+)\}\}/g, (_match, path: string) => {
-          // Try params first
           if (path in params) return String(params[path]);
 
-          // Try step results (e.g., "step_id.field[0].subfield")
           const parts = path.split('.');
           const stepId = parts[0];
           const stepResult = stepResults.get(stepId);
@@ -240,7 +242,6 @@ export class WorkflowRunner {
             let current: unknown = stepResult;
             for (let i = 1; i < parts.length && current != null; i++) {
               const part = parts[i];
-              // Handle array index syntax: "field[0]"
               const arrayMatch = part.match(/^(\w+)\[(\d+)\]$/);
               if (arrayMatch) {
                 current = (current as Record<string, unknown>)[arrayMatch[1]];
@@ -270,7 +271,6 @@ export class WorkflowRunner {
   }
 
   private waitForApproval(): Promise<boolean> {
-    // This will be wired to the IPC permission:respond handler
     return new Promise((resolve) => {
       const { ipcMain } = require('electron') as typeof import('electron');
       const handler = (_event: unknown, params: { approved: boolean }) => {

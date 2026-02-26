@@ -2,6 +2,7 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import type { MCPServerConfig, MCPLocalServerConfig } from '@github/copilot-sdk';
 
 export interface McpToolInfo {
   name: string;
@@ -41,13 +42,57 @@ export class McpRegistry {
     return process.cwd();
   }
 
+  /** Strip single-line (//) and block (/* *​/) comments from JSONC text. */
+  private stripJsonComments(text: string): string {
+    let result = '';
+    let i = 0;
+    let inString = false;
+    let escape = false;
+
+    while (i < text.length) {
+      const ch = text[i];
+      const next = text[i + 1];
+
+      if (inString) {
+        result += ch;
+        if (escape) { escape = false; }
+        else if (ch === '\\') { escape = true; }
+        else if (ch === '"') { inString = false; }
+        i++;
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = true;
+        result += ch;
+        i++;
+      } else if (ch === '/' && next === '/') {
+        // Skip until end of line
+        i += 2;
+        while (i < text.length && text[i] !== '\n') i++;
+      } else if (ch === '/' && next === '*') {
+        // Skip until */
+        i += 2;
+        while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i++;
+        i += 2; // skip closing */
+      } else {
+        result += ch;
+        i++;
+      }
+    }
+    // Strip trailing commas before } or ] (invalid in JSON, valid in JSONC)
+    result = result.replace(/,(\s*[}\]])/g, '$1');
+    return result;
+  }
+
   async load(): Promise<void> {
     try {
       const raw = await readFile(this.configPath, 'utf-8');
-      this.config = JSON.parse(raw) as McpConfig;
+      const clean = this.stripJsonComments(raw);
+      this.config = JSON.parse(clean) as McpConfig;
       this.buildToolList();
-    } catch {
-      console.warn(`[MCP Registry] Could not load ${this.configPath}`);
+    } catch (err) {
+      console.warn(`[MCP Registry] Could not load ${this.configPath}:`, err);
       this.config = { servers: {} };
       this.tools = [];
     }
@@ -109,5 +154,31 @@ export class McpRegistry {
 
   getServers(): string[] {
     return Object.keys(this.config.servers);
+  }
+
+  /** Workspace root derived from the config path. */
+  get workspaceRoot(): string {
+    return this.configPath.replace(/[\/\\]\.vscode[\/\\]mcp\.json$/, '');
+  }
+
+  /**
+   * Convert all loaded servers to the SDK's MCPServerConfig format.
+   * Used by CopilotClient when creating sessions.
+   */
+  toSdkMcpServers(): Record<string, MCPServerConfig> {
+    const result: Record<string, MCPServerConfig> = {};
+    const cwd = this.workspaceRoot;
+    for (const [name, cfg] of Object.entries(this.config.servers)) {
+      const sdkCfg: MCPLocalServerConfig = {
+        type: 'local',
+        command: cfg.command,
+        args: cfg.args ?? [],
+        tools: ['*'],
+        cwd,
+      };
+      if (cfg.env) sdkCfg.env = cfg.env;
+      result[name] = sdkCfg;
+    }
+    return result;
   }
 }

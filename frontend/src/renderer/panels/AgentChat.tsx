@@ -1,10 +1,11 @@
-// Agent Chat — message thread + tool call log + HITL approval (§5.3)
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { MessageSquare, Bot, SendHorizonal } from 'lucide-react';
-import { ToolCallLog } from '../components/ToolCallLog';
+// Agent Chat — unified message timeline with inline tool calls + HITL approval (§5.3)
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { MessageSquare, Bot, SendHorizonal, Wrench, Loader2, CheckCircle2, XCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { ApprovalCard } from '../components/ApprovalCard';
 import { CliActivityStream } from '../components/CliActivityStream';
 import { useAgentState, useAgUiEvents } from '../hooks/useAgUiTransport';
+import type { ToolCallEntry } from '../components/ToolCallLog';
 import type { ElectronAPI } from '../../main/preload';
 
 declare global {
@@ -20,6 +21,10 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+type TimelineItem =
+  | { kind: 'message'; data: ChatMessage }
+  | { kind: 'tool-call'; data: ToolCallEntry };
+
 export function AgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -33,12 +38,10 @@ export function AgentChat() {
     setMessages((prev) => {
       const lastMsg = prev[prev.length - 1];
       if (lastMsg?.role === 'assistant' && lastMsg.id.startsWith('assistant-stream-')) {
-        // Update existing streaming message
         return prev.map((m) =>
           m.id === lastMsg.id ? { ...m, content: streamingText } : m,
         );
       }
-      // Start new assistant message
       return [
         ...prev,
         {
@@ -51,14 +54,25 @@ export function AgentChat() {
     });
   }, [streamingText]);
 
-  // Auto-scroll to bottom on new messages
+  // Merge messages + tool calls into a chronological timeline
+  const timeline = useMemo<TimelineItem[]>(() => {
+    const items: TimelineItem[] = [
+      ...messages.map((m) => ({ kind: 'message' as const, data: m })),
+      ...toolCalls.map((tc) => ({ kind: 'tool-call' as const, data: tc })),
+    ];
+    items.sort((a, b) => a.data.timestamp.getTime() - b.data.timestamp.getTime());
+    return items;
+  }, [messages, toolCalls]);
+
+  const isStreaming = state.status === 'running' && streamingText.length > 0;
+
+  // Auto-scroll to bottom on new content
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, toolCalls]);
+  }, [timeline, interrupt, streamingText]);
 
   const handleSend = useCallback(async () => {
     if (!input.trim()) return;
-
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -67,8 +81,6 @@ export function AgentChat() {
     };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
-
-    // Send to main process via IPC
     if (window.electronAPI) {
       await window.electronAPI.copilot.run({
         skill: state.skill || 'default',
@@ -100,6 +112,12 @@ export function AgentChat() {
     }
   }, []);
 
+  // Filter CLI activity to exclude tool events (shown inline in timeline)
+  const filteredCliActivity = useMemo(
+    () => cliActivity.filter((e) => e.kind !== 'tool_invoked' && e.kind !== 'tool_completed'),
+    [cliActivity],
+  );
+
   return (
     <>
       <div className="panel-header">
@@ -113,30 +131,44 @@ export function AgentChat() {
         </button>
       </div>
 
-      {/* Messages */}
+      {/* Chronological timeline */}
       <div className="chat-messages">
-        {messages.length === 0 && (
+        {timeline.length === 0 && !interrupt && (
           <div className="empty-state">
             <MessageSquare size={32} className="empty-state-icon" />
             <div className="empty-state-text">What would you like to do?</div>
           </div>
         )}
 
-        {messages.map((msg) => (
-          <div key={msg.id} className={`chat-message ${msg.role}`}>
-            <div className="chat-message-header">
-              {msg.role === 'user' ? 'You' : <><Bot size={14} className="inline-icon" /> Copilot</>} —{' '}
-              {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </div>
-            {msg.content}
-          </div>
-        ))}
-
-        {/* CLI Activity Stream */}
-        {cliActivity.length > 0 && <CliActivityStream entries={cliActivity} />}
-
-        {/* Tool Call Log */}
-        {toolCalls.length > 0 && <ToolCallLog calls={toolCalls} />}
+        {timeline.map((item) => {
+          if (item.kind === 'message') {
+            const msg = item.data;
+            const isLastAssistant =
+              msg.role === 'assistant' &&
+              msg.id === messages[messages.length - 1]?.id;
+            return (
+              <div key={msg.id} className={`chat-message ${msg.role}`}>
+                <div className="chat-message-header">
+                  {msg.role === 'user' ? (
+                    'You'
+                  ) : (
+                    <><Bot size={14} className="inline-icon" /> Copilot</>
+                  )}{' '}
+                  — {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+                <div className="chat-message-body">
+                  {msg.role === 'assistant' ? (
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  ) : (
+                    msg.content
+                  )}
+                  {isLastAssistant && isStreaming && <span className="streaming-cursor" />}
+                </div>
+              </div>
+            );
+          }
+          return <InlineToolCall key={item.data.id} call={item.data} />;
+        })}
 
         {/* HITL Approval Card */}
         {interrupt && (
@@ -148,6 +180,11 @@ export function AgentChat() {
             onApprove={handleApprove}
             onSkip={handleSkip}
           />
+        )}
+
+        {/* CLI Activity (non-tool events only) */}
+        {filteredCliActivity.length > 0 && (
+          <CliActivityStream entries={filteredCliActivity} />
         )}
 
         <div ref={messagesEndRef} />
@@ -169,5 +206,65 @@ export function AgentChat() {
         </div>
       </div>
     </>
+  );
+}
+
+/** Single inline tool call row — expandable to show args/result. */
+function InlineToolCall({ call }: { call: ToolCallEntry }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const statusIcon =
+    call.status === 'pending' ? <Loader2 size={14} className="spin" /> :
+    call.status === 'success' ? <CheckCircle2 size={14} /> :
+    <XCircle size={14} />;
+
+  const statusClass =
+    call.status === 'pending' ? 'tool-inline-pending' :
+    call.status === 'success' ? 'tool-inline-success' :
+    'tool-inline-error';
+
+  return (
+    <div className={`tool-inline ${statusClass}`}>
+      <div className="tool-inline-row" onClick={() => setExpanded(!expanded)}>
+        <span className="tool-inline-icon">
+          <Wrench size={13} />
+        </span>
+        <span className={`tool-inline-status ${call.status}`}>
+          {statusIcon}
+        </span>
+        <span className="tool-inline-name">{call.name}</span>
+        {call.durationMs != null && call.durationMs > 0 && (
+          <span className="tool-inline-duration">{call.durationMs}ms</span>
+        )}
+        <span className="tool-inline-expand">
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        </span>
+      </div>
+      {expanded && (
+        <div className="tool-inline-detail">
+          {call.args && Object.keys(call.args).length > 0 && (
+            <div className="tool-inline-section">
+              <span className="tool-inline-section-label">Arguments</span>
+              <pre className="tool-inline-pre">{JSON.stringify(call.args, null, 2)}</pre>
+            </div>
+          )}
+          {call.result !== undefined && (
+            <div className="tool-inline-section">
+              <span className="tool-inline-section-label">Result</span>
+              <pre className="tool-inline-pre">
+                {typeof call.result === 'string' ? call.result : JSON.stringify(call.result, null, 2)}
+              </pre>
+            </div>
+          )}
+          {!call.args && call.result === undefined && (
+            <div className="tool-inline-section">
+              <span className="tool-inline-section-label">
+                {call.status === 'pending' ? 'Running…' : 'No details available'}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

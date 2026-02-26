@@ -1,5 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld("electronAPI", {
+  auth: {
+    azRefresh: () => ipcRenderer.invoke("auth:az-refresh")
+  },
   copilot: {
     run: (params) => ipcRenderer.invoke("copilot:run", params),
     cancel: (runId) => ipcRenderer.invoke("copilot:cancel", { runId }),

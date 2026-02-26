@@ -50,7 +50,7 @@ export function ApprovalCard({
       <div className="approval-body">
         <p className="approval-message">{message}</p>
         <div className="approval-tool">
-          Tool: <strong>{toolName}</strong>
+          Tool: <strong>{toolName || 'unknown'}</strong>
         </div>
 
         {/* Diff preview table */}
@@ -92,7 +92,7 @@ export function ApprovalCard({
             )}
           </div>
         ) : (
-          !diffPreview && proposedArgs && (
+          !diffPreview && proposedArgs && Object.keys(proposedArgs).length > 0 && (
             <pre className="approval-args">{JSON.stringify(proposedArgs, null, 2)}</pre>
           )
         )}

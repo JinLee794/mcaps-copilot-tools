@@ -3,6 +3,9 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { AgUiEvent } from '../shared/types/AgUiEvent';
 
 export interface ElectronAPI {
+  auth: {
+    azRefresh: () => Promise<{ ok: boolean; user?: string; error?: string }>;
+  };
   copilot: {
     run: (params: { skill: string; prompt: string; context: Record<string, unknown> }) => Promise<string>;
     cancel: (runId: string) => Promise<void>;
@@ -28,6 +31,9 @@ export interface ElectronAPI {
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  auth: {
+    azRefresh: () => ipcRenderer.invoke('auth:az-refresh'),
+  },
   copilot: {
     run: (params: { skill: string; prompt: string; context: Record<string, unknown> }) =>
       ipcRenderer.invoke('copilot:run', params),

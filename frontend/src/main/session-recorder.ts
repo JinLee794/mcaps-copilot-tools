@@ -5,7 +5,7 @@
 
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import type { CopilotSession, CopilotSdkEvent } from '../shared/types/CopilotSdk';
+import type { CopilotSession, SessionEvent } from '@github/copilot-sdk';
 
 // ── Session Log Types ───────────────────────────────────────────────
 
@@ -74,56 +74,43 @@ export class SessionRecorder {
    * Attach to a CopilotSession — subscribes to events passively.
    */
   attach(session: CopilotSession): void {
-    session.on((event: CopilotSdkEvent) => {
+    session.on((event: SessionEvent) => {
       this.handleEvent(event);
     });
   }
 
-  private handleEvent(event: CopilotSdkEvent): void {
+  private handleEvent(event: SessionEvent): void {
     switch (event.type) {
-      case 'tool.request': {
-        const callId = (event.data['callId'] as string) ?? `call-${Date.now()}`;
+      case 'tool.execution_start': {
+        const callId = event.data.toolCallId;
         this.pendingTools.set(callId, {
-          tool: event.data['name'] as string,
-          args: (event.data['args'] as Record<string, unknown>) ?? {},
+          tool: event.data.toolName,
+          args: (event.data.arguments as Record<string, unknown>) ?? {},
           start: Date.now(),
         });
         break;
       }
 
-      case 'tool.result': {
-        const callId = (event.data['callId'] as string) ?? '';
+      case 'tool.execution_complete': {
+        const callId = event.data.toolCallId;
         const pending = this.pendingTools.get(callId);
         if (pending) {
           const durationMs = Date.now() - pending.start;
-          const hasError = Boolean(event.data['error']);
           this.log.toolCallSequence.push({
             stepId: callId,
             tool: pending.tool,
             args: pending.args,
-            result: event.data['result'],
+            result: event.data.result?.content ?? null,
             durationMs,
-            status: hasError ? 'error' : 'success',
-            errorMessage: hasError ? String(event.data['error']) : undefined,
+            status: event.data.success ? 'success' : 'error',
           });
           this.pendingTools.delete(callId);
         }
         break;
       }
 
-      case 'permission.request': {
-        this.log.interruptEvents.push({
-          message: (event.data['message'] as string) ?? '',
-          tool: (event.data['tool'] as string) ?? '',
-          proposed: (event.data['proposed'] as Record<string, unknown>) ?? {},
-          userApproved: false, // Updated when user responds
-          timestamp: new Date().toISOString(),
-        });
-        break;
-      }
-
       case 'assistant.message_delta': {
-        const content = event.data['content'] as string | undefined;
+        const content = event.data.deltaContent;
         if (content) this.outputChunks.push(content);
         break;
       }

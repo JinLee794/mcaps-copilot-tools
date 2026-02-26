@@ -1,6 +1,6 @@
 // Renderer entry — three-panel layout with IPC-based transport (§4, §8)
 import React from 'react';
-import { Sparkles, Server, Terminal, Activity } from 'lucide-react';
+import { Sparkles, Server, Terminal, Activity, RefreshCw } from 'lucide-react';
 import { SkillsPanel } from './panels/SkillsPanel';
 import { ResearchCanvas } from './panels/ResearchCanvas';
 import { AgentChat } from './panels/AgentChat';
@@ -14,7 +14,18 @@ type CanvasView = 'research' | 'milestones';
 function AppShell() {
   const [showMcpInspector, setShowMcpInspector] = React.useState(false);
   const [canvasView, setCanvasView] = React.useState<CanvasView>('research');
+  const [azRefreshing, setAzRefreshing] = React.useState(false);
   const transport = useAgUiTransport();
+
+  const handleAzRefresh = async () => {
+    setAzRefreshing(true);
+    try {
+      const result = await window.electronAPI.auth.azRefresh();
+      if (!result.ok) console.error('az login failed:', result.error);
+    } finally {
+      setAzRefreshing(false);
+    }
+  };
 
   return (
       <div className="app-shell">
@@ -25,6 +36,15 @@ function AppShell() {
             <h1 className="app-title">Copilot Sales Assistant</h1>
           </div>
           <div className="header-right">
+            <button
+              className="header-btn"
+              onClick={handleAzRefresh}
+              disabled={azRefreshing}
+              title="Refresh Azure CLI credentials"
+            >
+              <RefreshCw size={14} className={azRefreshing ? 'spin' : ''} />
+              {azRefreshing ? 'Signing in...' : 'Az Login'}
+            </button>
             <span className="connection-status">
               <span className={`status-dot ${transport.connected ? 'connected' : 'disconnected'}`} />
               {transport.connected ? 'Connected' : 'Connecting...'}
