@@ -37,3 +37,4 @@ temp/
 # Beads local database/artifacts
 .beads/
 .connect/
+.copilot/

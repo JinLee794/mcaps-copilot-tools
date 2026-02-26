@@ -333,7 +333,7 @@ export function registerTools(server, crmClient) {
   // ── get_my_active_opportunities ─────────────────────────────
   server.tool(
     'get_my_active_opportunities',
-    'Returns active opportunities where you are the owner or on the deal team (via milestone ownership). Optionally filter by customer name.',
+    'Returns active opportunities where you are the owner or on the deal team. Optionally filter by customer name.',
     {
       customerKeyword: z.string().optional().describe('Case-insensitive customer name filter')
     },
@@ -352,15 +352,30 @@ export function registerTools(server, crmClient) {
       const ownedOpps = (ownedResult.ok ? ownedResult.data?.value : []) || [];
       const ownedIds = new Set(ownedOpps.map(o => o.opportunityid));
 
-      // 2. Discover deal-team opps via milestones owned by user
-      const msResult = await crmClient.requestAllPages('msp_engagementmilestones', {
-        query: { $filter: `_ownerid_value eq '${userId}'`, $select: '_msp_opportunityid_value' }
-      });
+      // 2. Discover deal-team opps via explicit deal-team membership
       const dealTeamOppIds = [];
-      if (msResult.ok && msResult.data?.value) {
-        for (const m of msResult.data.value) {
-          const oppId = m._msp_opportunityid_value;
+      const dealTeamResult = await crmClient.requestAllPages('msp_dealteams', {
+        query: {
+          $filter: `_msp_dealteamuserid_value eq '${userId}' and statecode eq 0`,
+          $select: '_msp_parentopportunityid_value'
+        }
+      });
+
+      if (dealTeamResult.ok && dealTeamResult.data?.value) {
+        for (const row of dealTeamResult.data.value) {
+          const oppId = row._msp_parentopportunityid_value;
           if (oppId && !ownedIds.has(oppId) && !dealTeamOppIds.includes(oppId)) dealTeamOppIds.push(oppId);
+        }
+      } else {
+        // Back-compat fallback for environments where msp_dealteams is unavailable.
+        const msResult = await crmClient.requestAllPages('msp_engagementmilestones', {
+          query: { $filter: `_ownerid_value eq '${userId}'`, $select: '_msp_opportunityid_value' }
+        });
+        if (msResult.ok && msResult.data?.value) {
+          for (const m of msResult.data.value) {
+            const oppId = m._msp_opportunityid_value;
+            if (oppId && !ownedIds.has(oppId) && !dealTeamOppIds.includes(oppId)) dealTeamOppIds.push(oppId);
+          }
         }
       }
 
