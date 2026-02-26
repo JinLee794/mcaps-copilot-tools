@@ -1,5 +1,14 @@
 {
 	"servers": {
+		"workiq": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@microsoft/workiq",
+				"mcp"
+			],
+			"type": "stdio"
+		},
 		"msx-crm": {
 			"type": "stdio",
 			"command": "/bin/zsh",
@@ -13,15 +22,25 @@
 				"MSX_TENANT_ID": "72f988bf-86f1-41af-91ab-2d7cd011db47"
 			}
 		},
-		"workiq": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"@microsoft/workiq",
-				"mcp"
-			],
-			"type": "stdio"
-		},
+
+		// Replace the above with me if you are on Windows and running Powershell. 
+		// "msx-crm-pwsh": {
+		// 	"type": "stdio",
+		// 	"command": "powershell",
+        //     "args": [
+        //         "-NoProfile",
+        //         "-Command",
+        //         "node mcp/msx/src/index.js"
+        //     ],
+		// 	"env": {
+		// 		"MSX_CRM_URL": "https://microsoftsales.crm.dynamics.com",
+		// 		"MSX_TENANT_ID": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+		// 	}
+		// },
+
+
+
+		// Optional Obsidian MCP integration https://mcp-obsidian.org/ https://obsidian.md/
 		// "mcp-obsidian": {
 		// 	"command": "npx",
 		// 	// "command": "node", 	// Use node if you're running the server locally (e.g., for development or with a local build of mcp-obsidian).
@@ -31,17 +50,11 @@
 		// 		"${input:obsidianVaultPath}"
 		// 	]
 		// 	// Optional: enables vault memory layer (prefetch + durable promotion).
-		// 	// Setup: Clone https://github.com/mcaps-copilot-tools/mcp-obsidian locally
+		// 	// Setup: Clone https://github.com/bitbonsai/mcp-obsidian locally
 		// 	// Run: npm install && npm run build in the mcp-obsidian directory
 		// 	// If not configured, all workflows fall back to .agent-memory/ (no breakage).
 		// },
-		"CopilotKit MCP": {
-			"command": "npx",
-			"args": [
-				"mcp-remote",
-				"https://mcp.copilotkit.ai"
-			]
-		}
+
 	},
 	"inputs": [
 		{

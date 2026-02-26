@@ -51,8 +51,8 @@ Use this repository as an MCP-first workflow.
 - What information is needed? (e.g., just milestone names, tasks, dates)
 
 **Step 2 — Use composite and batch tools first.** For common multi-customer workflows, prefer composite tools over chaining primitives:
-- `find_milestones_needing_tasks({ customerKeywords: ["Stryker", "Cencora", "BD"] })` — one call replaces the entire accounts→opportunities→milestones→tasks chain.
-- `list_opportunities({ customerKeyword: "Stryker" })` — resolves account names to GUIDs internally, no separate account lookup needed.
+- `find_milestones_needing_tasks({ customerKeywords: ["Contoso", "Fabrikam", "Northwind"] })` — one call replaces the entire accounts→opportunities→milestones→tasks chain.
+- `list_opportunities({ customerKeyword: "Contoso" })` — resolves account names to GUIDs internally, no separate account lookup needed.
 - `get_milestone_activities({ milestoneIds: ["ms1", "ms2", ..."] })` — batch task retrieval grouped by milestone.
 
 **Step 3 — Use `crm_query` for filtered milestone lookups.** This is the preferred tool for milestone queries that need filtering by status, date, or multiple opportunities. See `.github/instructions/crm-entity-schema.instructions.md` for the full entity schema reference.
@@ -85,7 +85,7 @@ Use this repository as an MCP-first workflow.
 - ❌ `crm_query` with `msp_forecastedconsumptionrecurring` in select — field does not exist
 - ❌ `crm_query` with `msp_estimatedcompletiondate` in select/filter — field does not exist on milestone; use `msp_milestonedate`
 - ❌ Loop: `list_opportunities` per customer → `get_milestones` per opp → `get_milestone_activities` per milestone (~30 calls)
-- ✅ `find_milestones_needing_tasks({ customerKeywords: ["Stryker", "Cencora", "BD"] })` (1 call)
+- ✅ `find_milestones_needing_tasks({ customerKeywords: ["Contoso", "Fabrikam", "Northwind"] })` (1 call)
 - ✅ `crm_query({ entitySet: "msp_engagementmilestones", filter: "_msp_opportunityid_value eq '...' and msp_milestonestatus eq 861980000", top: 25 })` (filtered, efficient)
 - ✅ `get_milestone_activities({ milestoneIds: ["ms1", "ms2", "ms3"] })` (1 call instead of 3)
 
