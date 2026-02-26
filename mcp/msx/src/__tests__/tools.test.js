@@ -152,20 +152,20 @@ describe('registerTools', () => {
       // First call: account search by keyword
       crm.requestAllPages.mockResolvedValueOnce({
         ok: true, status: 200, data: { value: [
-          { accountid: '11111111-1111-1111-1111-111111111111', name: 'Stryker Corp' }
+          { accountid: '11111111-1111-1111-1111-111111111111', name: 'Contoso Corp' }
         ] }
       });
       // Second call: opportunities for resolved account
       crm.requestAllPages.mockResolvedValueOnce({
         ok: true, status: 200, data: { value: [
-          { opportunityid: 'opp-1', name: 'Stryker Azure Migration' }
+          { opportunityid: 'opp-1', name: 'Contoso Azure Migration' }
         ] }
       });
-      const result = await callTool(server, 'list_opportunities', { customerKeyword: 'Stryker' });
+      const result = await callTool(server, 'list_opportunities', { customerKeyword: 'Contoso' });
       expect(result.isError).toBeUndefined();
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.count).toBe(1);
-      expect(parsed.opportunities[0].name).toBe('Stryker Azure Migration');
+      expect(parsed.opportunities[0].name).toBe('Contoso Azure Migration');
       // Verify account search was called with contains filter
       expect(crm.requestAllPages).toHaveBeenCalledWith('accounts', expect.objectContaining({
         query: expect.objectContaining({ $filter: expect.stringContaining('contains(name') })
@@ -493,16 +493,16 @@ describe('registerTools', () => {
 
   describe('find_milestones_needing_tasks', () => {
     it('resolves customers → opps → milestones and returns those without tasks', async () => {
-      // 1. Account search for "Stryker"
+      // 1. Account search for "Contoso"
       crm.requestAllPages.mockResolvedValueOnce({
         ok: true, status: 200, data: { value: [
-          { accountid: 'acct-1', name: 'Stryker Corp' }
+          { accountid: 'acct-1', name: 'Contoso Corp' }
         ] }
       });
       // 2. Opportunities for that account
       crm.requestAllPages.mockResolvedValueOnce({
         ok: true, status: 200, data: { value: [
-          { opportunityid: 'opp-1', name: 'Stryker Azure AI' }
+          { opportunityid: 'opp-1', name: 'Contoso Azure AI' }
         ] }
       });
       // 3. Milestones for the opportunity
@@ -536,12 +536,12 @@ describe('registerTools', () => {
       });
 
       const result = await callTool(server, 'find_milestones_needing_tasks', {
-        customerKeywords: ['Stryker']
+        customerKeywords: ['Contoso']
       });
       expect(result.isError).toBeUndefined();
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.totalMilestonesNeedingTasks).toBe(1);
-      expect(parsed.customers[0].customer).toBe('Stryker');
+      expect(parsed.customers[0].customer).toBe('Contoso');
       expect(parsed.customers[0].milestonesNeedingTasks).toBe(1);
       expect(parsed.customers[0].milestones[0].name).toBe('PoC');
     });
