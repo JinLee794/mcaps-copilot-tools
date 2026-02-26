@@ -11,34 +11,15 @@
 		},
 		"msx-crm": {
 			"type": "stdio",
-			"command": "/bin/zsh",
+			"command": "node",
 			"args": [
-				"-l",
-				"-c",
-				"node mcp/msx/src/index.js"
+				"mcp/msx/src/index.js"
 			],
 			"env": {
 				"MSX_CRM_URL": "https://microsoftsales.crm.dynamics.com",
 				"MSX_TENANT_ID": "72f988bf-86f1-41af-91ab-2d7cd011db47"
 			}
 		},
-
-		// Replace the above with me if you are on Windows and running Powershell. 
-		// "msx-crm-pwsh": {
-		// 	"type": "stdio",
-		// 	"command": "powershell",
-        //     "args": [
-        //         "-NoProfile",
-        //         "-Command",
-        //         "node mcp/msx/src/index.js"
-        //     ],
-		// 	"env": {
-		// 		"MSX_CRM_URL": "https://microsoftsales.crm.dynamics.com",
-		// 		"MSX_TENANT_ID": "72f988bf-86f1-41af-91ab-2d7cd011db47"
-		// 	}
-		// },
-
-
 
 		// Optional Obsidian MCP integration https://mcp-obsidian.org/ https://obsidian.md/
 		// "mcp-obsidian": {
