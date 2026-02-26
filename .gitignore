@@ -33,3 +33,5 @@ temp/
 
 # Local agent memory (untracked)
 .agent-memory/
+
+.vscode/mcp.json

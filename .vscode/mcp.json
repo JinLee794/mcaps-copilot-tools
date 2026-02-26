@@ -1,6 +1,14 @@
 {
 	"servers": {
-
+		"workiq": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@microsoft/workiq",
+				"mcp"
+			],
+			"type": "stdio"
+		},
 		"msx-crm": {
 			"type": "stdio",
 			"command": "/bin/zsh",
@@ -29,16 +37,8 @@
 		// 		"MSX_TENANT_ID": "72f988bf-86f1-41af-91ab-2d7cd011db47"
 		// 	}
 		// },
-		
-		"workiq": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"@microsoft/workiq",
-				"mcp"
-			],
-			"type": "stdio"
-		},
+
+
 
 		// Optional Obsidian MCP integration https://mcp-obsidian.org/ https://obsidian.md/
 		// "mcp-obsidian": {
