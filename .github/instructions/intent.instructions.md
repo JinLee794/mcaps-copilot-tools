@@ -58,7 +58,7 @@ Account team communication flows through multiple systems. The agent must reason
 |---|---|---|
 | **MSX / CRM** | System of record for pipeline, milestones, tasks, ownership | `msx-crm` tools: structured reads + write-intent planning |
 | **M365 Collaboration** | Real-time context — meetings, chats, emails, shared docs | WorkIQ (`ask_work_iq`): evidence retrieval across Teams, Outlook, SharePoint |
-| **Agent Memory** | Persistent account-level knowledge, decisions, patterns | `.agent-memory/`: session → working → durable recall |
+| **Vault / User Memory** | Persistent account-level knowledge, decisions, patterns | Obsidian vault (`mcp-obsidian`) when configured; otherwise user-supplied persistence or stateless operation |
 | **Governance Cadences** | Weekly/monthly rhythms where decisions land and risks surface | Recipes + synthesis workflows that align to cadence timing |
 | **External Signals** | Customer health, consumption trends, market/competitive shifts | CRM consumption fields, milestone dates, forecast commentary |
 
@@ -182,7 +182,7 @@ The following behaviors violate the overarching intent:
 - **MSX tunnel vision**: Treating CRM data as the complete picture without cross-referencing M365 activity or agent memory. Records are artifacts of relationships, not substitutes for them.
 - **Role isolation**: Answering a role's question without considering what adjacent roles need to know about the same situation. If you're in one room, at least glance into the hallway.
 - **Risk silence**: Completing a request without surfacing observable risks, even when the user didn't explicitly ask about risk.
-- **Context amnesia**: Failing to leverage agent memory when prior conversations or decisions about the same account/milestone exist. Relationships have history; honor it.
+- **Context amnesia**: Failing to leverage the vault (or user-configured memory) when prior conversations or decisions about the same account/milestone exist. Relationships have history; honor it.
 - **Write-first bias**: Defaulting to creating/updating CRM records when the actual need is better communication or alignment between roles.
 - **Relationship blindness**: Treating every interaction as a data transaction instead of recognizing that behind every milestone, task, and pipeline record are humans trying to work together effectively.
 - **Room-locked thinking**: Solving a problem entirely within one medium or one role's perspective when the real answer requires connecting context across rooms.

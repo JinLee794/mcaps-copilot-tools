@@ -58,11 +58,12 @@ function translateSdkToAgUi(event, runId) {
     case "tool.execution_complete":
       return createAgUiEvent(AgUiEventType.TOOL_CALL_END, runId, {
         toolName: "",
-        // Not available on completion events
+        // Resolved by copilot-handlers from pendingToolCalls
         callId: event.data.toolCallId,
         result: event.data.result?.content ?? null,
         status: event.data.success ? "success" : "error",
         durationMs: 0
+        // Computed by copilot-handlers from start timestamp
       });
     case "session.error":
       return createAgUiEvent(AgUiEventType.RUN_ERROR, runId, {
@@ -216,12 +217,271 @@ class SessionRecorder {
     return { ...this.log };
   }
 }
+const TOOL_SOURCE_MAP = {
+  get_milestones: "milestones",
+  find_milestones_needing_tasks: "milestones",
+  list_opportunities: "opportunities",
+  get_my_active_opportunities: "opportunities",
+  get_milestone_activities: "tasks"
+};
+function getSourceKeyForTool(toolName, args) {
+  if (TOOL_SOURCE_MAP[toolName]) return TOOL_SOURCE_MAP[toolName];
+  if (toolName === "ask_work_iq") return detectWorkIqScope(args ?? {});
+  if (toolName === "crm_query") return detectCrmQuerySource(args ?? {});
+  return null;
+}
+function routeToolResult(completion) {
+  const { toolName, args, result, success } = completion;
+  const sourceKey = getSourceKeyForTool(toolName, args);
+  if (!success) {
+    return sourceKey ? { sourceKey, status: "error", errorInfo: parseToolError(result) } : null;
+  }
+  if (!sourceKey) return null;
+  const parsed = parseToolResult(result);
+  if (!parsed) return { sourceKey, status: "loaded", count: 0, records: [] };
+  switch (toolName) {
+    case "get_milestones":
+    case "find_milestones_needing_tasks": {
+      const milestones = extractArray(parsed, "milestones") ?? extractTopLevelArray(parsed);
+      return {
+        sourceKey: "milestones",
+        status: "loaded",
+        count: milestones.length,
+        records: milestones,
+        signals: extractMilestoneSignals(milestones)
+      };
+    }
+    case "list_opportunities":
+    case "get_my_active_opportunities": {
+      const opps = extractArray(parsed, "opportunities") ?? extractTopLevelArray(parsed);
+      return {
+        sourceKey: "opportunities",
+        status: "loaded",
+        count: opps.length,
+        records: opps
+      };
+    }
+    case "get_milestone_activities": {
+      const tasks = extractArray(parsed, "tasks") ?? extractArray(parsed, "activities") ?? extractTopLevelArray(parsed);
+      return {
+        sourceKey: "tasks",
+        status: "loaded",
+        count: tasks.length,
+        records: tasks,
+        signals: extractTaskSignals(tasks)
+      };
+    }
+    case "ask_work_iq": {
+      return {
+        sourceKey,
+        status: "loaded",
+        count: typeof parsed.count === "number" ? parsed.count : extractTopLevelArray(parsed).length,
+        records: extractTopLevelArray(parsed)
+      };
+    }
+    case "crm_query": {
+      const records = extractArray(parsed, "value") ?? extractTopLevelArray(parsed);
+      return {
+        sourceKey,
+        status: "loaded",
+        count: records.length,
+        records,
+        signals: sourceKey === "milestones" ? extractMilestoneSignals(records) : void 0
+      };
+    }
+    default:
+      return null;
+  }
+}
+function detectWorkIqScope(args) {
+  const query = String(args["query"] ?? "").toLowerCase();
+  const scope = String(args["scope"] ?? "").toLowerCase();
+  if (scope === "email" || scope === "outlook") return "emails";
+  if (scope === "transcript" || scope === "meeting") return "transcripts";
+  if (scope === "teams" || scope === "chat" || scope === "channel") return "teams";
+  if (scope === "file" || scope === "sharepoint" || scope === "onedrive") return "sharepoint";
+  if (/\b(email|outlook|inbox|sent)\b/.test(query)) return "emails";
+  if (/\b(transcript|recording|meeting)\b/.test(query)) return "transcripts";
+  if (/\b(teams|chat|channel|message)\b/.test(query)) return "teams";
+  if (/\b(file|document|sharepoint|onedrive)\b/.test(query)) return "sharepoint";
+  return null;
+}
+function detectCrmQuerySource(args) {
+  const entitySet = String(args["entitySet"] ?? "").toLowerCase();
+  if (entitySet.includes("milestone")) return "milestones";
+  if (entitySet.includes("task") || entitySet.includes("activit")) return "tasks";
+  if (entitySet.includes("opportunit")) return "opportunities";
+  return null;
+}
+function parseToolResult(result) {
+  if (!result) return null;
+  if (typeof result === "object" && !Array.isArray(result)) {
+    const obj = result;
+    if (Array.isArray(obj["content"])) {
+      const firstContent = obj["content"][0];
+      if (firstContent?.type === "text" && typeof firstContent.text === "string") {
+        try {
+          return JSON.parse(firstContent.text);
+        } catch {
+          return { text: firstContent.text };
+        }
+      }
+    }
+    return obj;
+  }
+  if (typeof result === "string") {
+    try {
+      const parsed = JSON.parse(result);
+      return typeof parsed === "object" && parsed !== null ? parsed : { value: parsed };
+    } catch {
+      return { text: result };
+    }
+  }
+  if (Array.isArray(result)) {
+    return { items: result };
+  }
+  return null;
+}
+function extractArray(obj, key) {
+  const val = obj[key];
+  return Array.isArray(val) ? val : null;
+}
+function extractTopLevelArray(obj) {
+  for (const val of Object.values(obj)) {
+    if (Array.isArray(val)) return val;
+  }
+  return [];
+}
+function extractMilestoneSignals(milestones) {
+  const signals = [];
+  if (milestones.length === 0) return signals;
+  const statusCounts = {};
+  for (const m of milestones) {
+    const status = m["msp_milestonestatus@OData.Community.Display.V1.FormattedValue"] ?? String(m.msp_milestonestatus);
+    statusCounts[status] = (statusCounts[status] ?? 0) + 1;
+  }
+  const statusParts = Object.entries(statusCounts).map(([s, c]) => `${c} ${s}`);
+  if (statusParts.length > 0) signals.push(statusParts.join(" · "));
+  const atRisk = milestones.filter((m) => {
+    const fv = m["msp_milestonestatus@OData.Community.Display.V1.FormattedValue"];
+    return fv === "At Risk" || m.msp_milestonestatus === 861980002;
+  });
+  if (atRisk.length > 0) signals.push(`${atRisk.length} milestone${atRisk.length > 1 ? "s" : ""} at risk`);
+  const now = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const overdue = milestones.filter(
+    (m) => m.msp_milestonedate && m.msp_milestonedate < now && m.msp_milestonestatus !== 861980003
+  );
+  if (overdue.length > 0) signals.push(`${overdue.length} overdue`);
+  return signals;
+}
+function extractTaskSignals(tasks) {
+  const signals = [];
+  if (tasks.length === 0) return signals;
+  const overdue = tasks.filter((t) => {
+    if (!t.scheduledend) return false;
+    return t.scheduledend < (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) && t.statecode === 0;
+  });
+  if (overdue.length > 0) signals.push(`${overdue.length} overdue task${overdue.length > 1 ? "s" : ""}`);
+  const open = tasks.filter((t) => t.statecode === 0);
+  const closed = tasks.filter((t) => t.statecode !== 0);
+  signals.push(`${open.length} open · ${closed.length} closed`);
+  return signals;
+}
+function parseToolError(result) {
+  const text = typeof result === "string" ? result : JSON.stringify(result ?? "");
+  const lower = text.toLowerCase();
+  if (lower.includes("401") || lower.includes("unauthorized") || lower.includes("token expired")) {
+    return { code: "401", message: "Authentication expired or invalid", action: "Re-authenticate with CRM" };
+  }
+  if (lower.includes("403") || lower.includes("forbidden") || lower.includes("access denied")) {
+    return { code: "403", message: "Insufficient permissions for this operation", action: "Check role assignment" };
+  }
+  if (lower.includes("404") || lower.includes("not found") || lower.includes("does not exist")) {
+    return { code: "404", message: "Record not found", action: "Verify the record ID is correct" };
+  }
+  if (lower.includes("429") || lower.includes("rate limit") || lower.includes("throttl")) {
+    return { code: "429", message: "Rate limited by CRM API", action: "Wait a moment and retry" };
+  }
+  if (lower.includes("500") || lower.includes("internal server")) {
+    return { code: "500", message: "CRM server error", action: "Retry or check CRM service health" };
+  }
+  if (lower.includes("timeout") || lower.includes("econnrefused") || lower.includes("network")) {
+    return { code: "NETWORK", message: "Network or connection error", action: "Check connectivity" };
+  }
+  return { code: "UNKNOWN", message: text.slice(0, 200) };
+}
+const WRITE_TOOLS = /* @__PURE__ */ new Set(["create_task", "update_task", "close_task", "update_milestone"]);
+const CRM_FIELD_LABELS = {
+  milestoneId: "Milestone ID",
+  milestoneDate: "Milestone Date",
+  msp_milestonedate: "Milestone Date",
+  monthlyUse: "Monthly Use ($)",
+  msp_monthlyuse: "Monthly Use ($)",
+  forecastComments: "Forecast Comments",
+  msp_forecastcomments: "Forecast Comments",
+  taskId: "Task ID",
+  subject: "Subject",
+  dueDate: "Due Date",
+  scheduledend: "Due Date",
+  description: "Description",
+  statusCode: "Status Code",
+  category: "Task Category",
+  ownerId: "Owner ID"
+};
+function buildWriteToolDiffPreview(toolName, args) {
+  if (!WRITE_TOOLS.has(toolName)) return void 0;
+  const rows = [];
+  for (const [key, value] of Object.entries(args)) {
+    if (value == null) continue;
+    if (key === "milestoneId" || key === "taskId") continue;
+    const label = CRM_FIELD_LABELS[key] ?? key;
+    rows.push({
+      field: label,
+      before: toolName === "create_task" ? "(new)" : "(current)",
+      after: String(value)
+    });
+  }
+  return rows.length > 0 ? rows : void 0;
+}
 let activeRunId = null;
 let activeSession = null;
+let activeSessionMeta = null;
 let activeRecorder = null;
 let copilotClient = null;
 let permissionResolve = null;
 const pendingToolCalls = /* @__PURE__ */ new Map();
+async function getSessionsDir() {
+  const { join: join2 } = await import("node:path");
+  return join2(process.cwd(), ".copilot", "sessions");
+}
+async function loadSessionIndex() {
+  const { readFile: readFile2 } = await import("node:fs/promises");
+  const { join: join2 } = await import("node:path");
+  try {
+    const raw = await readFile2(join2(await getSessionsDir(), "index.json"), "utf-8");
+    const data = JSON.parse(raw);
+    return Array.isArray(data.sessions) ? data.sessions : [];
+  } catch {
+    return [];
+  }
+}
+async function saveSessionIndex(sessions) {
+  const { writeFile: writeFile2, mkdir: mkdir2 } = await import("node:fs/promises");
+  const { join: join2 } = await import("node:path");
+  const dir = await getSessionsDir();
+  await mkdir2(dir, { recursive: true });
+  await writeFile2(join2(dir, "index.json"), JSON.stringify({ sessions }, null, 2), "utf-8");
+}
+async function upsertSessionMeta(meta) {
+  const sessions = await loadSessionIndex();
+  const idx = sessions.findIndex((s) => s.id === meta.id);
+  if (idx >= 0) {
+    sessions[idx] = meta;
+  } else {
+    sessions.unshift(meta);
+  }
+  await saveSessionIndex(sessions);
+}
 function emitCliActivity(window, runId, kind, label, detail) {
   window.webContents.send(
     "ag-ui:event",
@@ -253,6 +513,19 @@ function registerIpcHandlers(mcpRegistry2, skillsLoader2) {
       skill: params.skill
     }));
     try {
+      if (activeSession && activeSessionMeta) {
+        activeSessionMeta.messageCount += 1;
+        activeSessionMeta.lastActiveAt = (/* @__PURE__ */ new Date()).toISOString();
+        await upsertSessionMeta(activeSessionMeta);
+        emitCliActivity(window, runId, "prompt_sent", "Follow-up sent to existing session", params.prompt.slice(0, 200));
+        window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.STATE_DELTA, runId, {
+          sessionId: activeSessionMeta.id,
+          sessionTitle: activeSessionMeta.title,
+          messageCount: activeSessionMeta.messageCount
+        }));
+        await activeSession.send({ prompt: params.prompt });
+        return runId;
+      }
       const client = getClient(mcpRegistry2);
       const skill = skillsLoader2.getSkill(params.skill);
       const systemPrompt = skill?.rawContent ?? `You are a sales assistant. Run the "${params.skill}" skill.`;
@@ -280,13 +553,14 @@ function registerIpcHandlers(mcpRegistry2, skillsLoader2) {
           const action = kindLabels[request.kind] ?? `Permission: ${request.kind}`;
           const message = `${action} — ${toolName}`;
           return new Promise((resolve) => {
+            const diffPreview = buildWriteToolDiffPreview(toolName, proposedArgs);
             window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.INTERRUPT, runId, {
               message,
               toolName,
-              proposedArgs
+              proposedArgs,
+              ...diffPreview ? { diffPreview } : {}
             }));
             permissionResolve = (resp) => {
-              if (request.toolCallId) pendingToolCalls.delete(request.toolCallId);
               resolve({
                 kind: resp.approved ? "approved" : "denied-interactively-by-user"
               });
@@ -295,7 +569,22 @@ function registerIpcHandlers(mcpRegistry2, skillsLoader2) {
         }
       });
       activeSession = session;
+      const sessionTitle = params.prompt.slice(0, 80).replace(/\n/g, " ").trim() || "Untitled session";
+      activeSessionMeta = {
+        id: session.sessionId,
+        skillId: params.skill,
+        createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+        lastActiveAt: (/* @__PURE__ */ new Date()).toISOString(),
+        messageCount: 1,
+        title: sessionTitle
+      };
+      await upsertSessionMeta(activeSessionMeta);
       emitCliActivity(window, runId, "session_created", `Session created: ${session.sessionId}`);
+      window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.STATE_DELTA, runId, {
+        sessionId: session.sessionId,
+        sessionTitle,
+        messageCount: 1
+      }));
       const recorder = new SessionRecorder(
         session.sessionId,
         params.skill,
@@ -305,26 +594,76 @@ function registerIpcHandlers(mcpRegistry2, skillsLoader2) {
       recorder.attach(session);
       activeRecorder = recorder;
       session.on((sdkEvent) => {
-        emitAgUiEvent(window, sdkEvent, runId);
+        if (sdkEvent.type === "tool.execution_complete") {
+          const toolInfo = pendingToolCalls.get(sdkEvent.data.toolCallId);
+          const durationMs = toolInfo ? Date.now() - toolInfo.startedAt : 0;
+          const resolvedName = toolInfo?.toolName ?? "";
+          const resolvedArgs = toolInfo?.arguments ?? {};
+          pendingToolCalls.delete(sdkEvent.data.toolCallId);
+          const sourceUpdate = routeToolResult({
+            toolName: resolvedName,
+            args: resolvedArgs,
+            result: sdkEvent.data.result?.content ?? sdkEvent.data.result,
+            success: sdkEvent.data.success ?? true
+          });
+          window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.TOOL_CALL_END, runId, {
+            toolName: resolvedName,
+            callId: sdkEvent.data.toolCallId,
+            result: sdkEvent.data.result?.content ?? null,
+            status: sdkEvent.data.success ? "success" : "error",
+            durationMs,
+            ...sourceUpdate?.errorInfo ? { errorInfo: sourceUpdate.errorInfo } : {},
+            ...sourceUpdate?.signals?.length ? { summary: sourceUpdate.signals.join(" · ") } : {}
+          }));
+          if (sourceUpdate) {
+            const sourcePayload = {
+              status: sourceUpdate.status,
+              count: sourceUpdate.count ?? 0,
+              records: sourceUpdate.records ?? [],
+              signals: sourceUpdate.signals ?? [],
+              lastFetched: (/* @__PURE__ */ new Date()).toISOString()
+            };
+            if (sourceUpdate.errorInfo) {
+              sourcePayload.errorInfo = sourceUpdate.errorInfo;
+            }
+            window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.STATE_DELTA, runId, {
+              sources: {
+                [sourceUpdate.sourceKey]: sourcePayload
+              }
+            }));
+          }
+          emitCliActivity(
+            window,
+            runId,
+            "tool_completed",
+            `Completed: ${resolvedName || sdkEvent.data.toolCallId} (${durationMs}ms)`
+          );
+        } else {
+          emitAgUiEvent(window, sdkEvent, runId);
+        }
         if (sdkEvent.type === "tool.execution_start") {
           pendingToolCalls.set(sdkEvent.data.toolCallId, {
             toolName: sdkEvent.data.toolName,
-            arguments: sdkEvent.data.arguments
+            arguments: sdkEvent.data.arguments,
+            startedAt: Date.now()
           });
+          const sourceKey = getSourceKeyForTool(
+            sdkEvent.data.toolName,
+            sdkEvent.data.arguments
+          );
+          if (sourceKey) {
+            window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.STATE_DELTA, runId, {
+              sources: {
+                [sourceKey]: { status: "loading", count: 0, records: [], signals: [] }
+              }
+            }));
+          }
           emitCliActivity(
             window,
             runId,
             "tool_invoked",
             `Calling: ${sdkEvent.data.toolName}`,
             sdkEvent.data.arguments ? JSON.stringify(sdkEvent.data.arguments).slice(0, 300) : void 0
-          );
-        } else if (sdkEvent.type === "tool.execution_complete") {
-          pendingToolCalls.delete(sdkEvent.data.toolCallId);
-          emitCliActivity(
-            window,
-            runId,
-            "tool_completed",
-            `Completed: ${sdkEvent.data.toolCallId}`
           );
         }
       });
@@ -343,8 +682,156 @@ function registerIpcHandlers(mcpRegistry2, skillsLoader2) {
     if (activeRunId === runId && activeSession) {
       activeSession.abort();
       activeSession = null;
+      activeSessionMeta = null;
       activeRunId = null;
     }
+  });
+  ipcMain.handle("copilot:new-session", async () => {
+    if (activeSession) {
+      try {
+        activeSession.abort();
+      } catch {
+      }
+    }
+    activeSession = null;
+    activeSessionMeta = null;
+    activeRunId = null;
+    activeRecorder = null;
+    return { ok: true };
+  });
+  ipcMain.handle("copilot:list-sessions", async () => {
+    const sessions = await loadSessionIndex();
+    return { sessions };
+  });
+  ipcMain.handle("copilot:get-active-session", async () => {
+    return { session: activeSessionMeta };
+  });
+  ipcMain.handle("copilot:resume-session", async (event, { sessionId }) => {
+    const { readFile: readFile2 } = await import("node:fs/promises");
+    const { join: join2 } = await import("node:path");
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) return { error: "No window" };
+    if (activeSession) {
+      try {
+        activeSession.abort();
+      } catch {
+      }
+      activeSession = null;
+    }
+    const sessionsDir = await getSessionsDir();
+    let sessionLog = null;
+    try {
+      const raw = await readFile2(join2(sessionsDir, `session-${sessionId}.json`), "utf-8");
+      sessionLog = JSON.parse(raw);
+    } catch {
+    }
+    const sessions = await loadSessionIndex();
+    const meta = sessions.find((s) => s.id === sessionId);
+    if (!meta) return { error: "Session not found" };
+    let contextSummary = "";
+    if (sessionLog?.finalOutput) {
+      contextSummary = `
+
+Previous conversation summary:
+${sessionLog.finalOutput.slice(0, 2e3)}`;
+    }
+    if (sessionLog?.toolCallSequence?.length) {
+      const toolSummary = sessionLog.toolCallSequence.slice(-10).map((t) => `- ${t.tool}(${JSON.stringify(t.args).slice(0, 100)})`).join("\n");
+      contextSummary += `
+
+Recent tool calls from previous session:
+${toolSummary}`;
+    }
+    const client = getClient(mcpRegistry2);
+    const skill = skillsLoader2.getSkill(meta.skillId);
+    const systemPrompt = skill?.rawContent ?? `You are a sales assistant. Run the "${meta.skillId}" skill.`;
+    const workspaceRoot = mcpRegistry2.workspaceRoot;
+    const session = await client.createSession({
+      model: "claude-sonnet-4",
+      systemMessage: {
+        mode: "append",
+        content: systemPrompt + contextSummary
+      },
+      streaming: true,
+      workingDirectory: workspaceRoot,
+      onPermissionRequest: async (request) => {
+        const toolInfo = request.toolCallId ? pendingToolCalls.get(request.toolCallId) : void 0;
+        const toolName = toolInfo?.toolName ?? request.kind;
+        const proposedArgs = toolInfo?.arguments ?? {};
+        const kindLabels = {
+          shell: "Run a terminal command",
+          write: "Write to a file",
+          mcp: "Call an MCP tool",
+          read: "Read a file",
+          url: "Fetch a URL"
+        };
+        const action = kindLabels[request.kind] ?? `Permission: ${request.kind}`;
+        const message = `${action} — ${toolName}`;
+        return new Promise((resolve) => {
+          const diffPreview = buildWriteToolDiffPreview(toolName, proposedArgs);
+          window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.INTERRUPT, activeRunId ?? "resumed", {
+            message,
+            toolName,
+            proposedArgs,
+            ...diffPreview ? { diffPreview } : {}
+          }));
+          permissionResolve = (resp) => {
+            resolve({ kind: resp.approved ? "approved" : "denied-interactively-by-user" });
+          };
+        });
+      }
+    });
+    activeSession = session;
+    activeSessionMeta = { ...meta, lastActiveAt: (/* @__PURE__ */ new Date()).toISOString() };
+    await upsertSessionMeta(activeSessionMeta);
+    session.on((sdkEvent) => {
+      if (sdkEvent.type === "tool.execution_complete") {
+        const toolInfo = pendingToolCalls.get(sdkEvent.data.toolCallId);
+        const durationMs = toolInfo ? Date.now() - toolInfo.startedAt : 0;
+        const resolvedName = toolInfo?.toolName ?? "";
+        const resolvedArgs = toolInfo?.arguments ?? {};
+        pendingToolCalls.delete(sdkEvent.data.toolCallId);
+        const sourceUpdate = routeToolResult({ toolName: resolvedName, args: resolvedArgs, result: sdkEvent.data.result?.content ?? sdkEvent.data.result, success: sdkEvent.data.success ?? true });
+        window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.TOOL_CALL_END, activeRunId ?? "resumed", {
+          toolName: resolvedName,
+          callId: sdkEvent.data.toolCallId,
+          result: sdkEvent.data.result?.content ?? null,
+          status: sdkEvent.data.success ? "success" : "error",
+          durationMs,
+          ...sourceUpdate?.errorInfo ? { errorInfo: sourceUpdate.errorInfo } : {},
+          ...sourceUpdate?.signals?.length ? { summary: sourceUpdate.signals.join(" · ") } : {}
+        }));
+        if (sourceUpdate) {
+          const sourcePayload = {
+            status: sourceUpdate.status,
+            count: sourceUpdate.count ?? 0,
+            records: sourceUpdate.records ?? [],
+            signals: sourceUpdate.signals ?? [],
+            lastFetched: (/* @__PURE__ */ new Date()).toISOString()
+          };
+          if (sourceUpdate.errorInfo) sourcePayload.errorInfo = sourceUpdate.errorInfo;
+          window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.STATE_DELTA, activeRunId ?? "resumed", {
+            sources: { [sourceUpdate.sourceKey]: sourcePayload }
+          }));
+        }
+      } else {
+        emitAgUiEvent(window, sdkEvent, activeRunId ?? "resumed");
+      }
+      if (sdkEvent.type === "tool.execution_start") {
+        pendingToolCalls.set(sdkEvent.data.toolCallId, {
+          toolName: sdkEvent.data.toolName,
+          arguments: sdkEvent.data.arguments,
+          startedAt: Date.now()
+        });
+        const sourceKey = getSourceKeyForTool(sdkEvent.data.toolName, sdkEvent.data.arguments);
+        if (sourceKey) {
+          window.webContents.send("ag-ui:event", createAgUiEvent(AgUiEventType.STATE_DELTA, activeRunId ?? "resumed", {
+            sources: { [sourceKey]: { status: "loading", count: 0, records: [], signals: [] } }
+          }));
+        }
+      }
+    });
+    return { ok: true, session: activeSessionMeta };
   });
   ipcMain.handle("copilot:capture-workflow", async () => {
     if (!activeRecorder) return { error: "No session to capture" };

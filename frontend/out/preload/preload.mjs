@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
       return () => ipcRenderer.removeListener("ag-ui:event", handler);
     }
   },
+  sessions: {
+    list: () => ipcRenderer.invoke("copilot:list-sessions"),
+    getActive: () => ipcRenderer.invoke("copilot:get-active-session"),
+    newSession: () => ipcRenderer.invoke("copilot:new-session"),
+    resume: (sessionId) => ipcRenderer.invoke("copilot:resume-session", { sessionId })
+  },
   mcp: {
     listTools: () => ipcRenderer.invoke("mcp:list-tools"),
     onToolResult: (callback) => {

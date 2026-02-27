@@ -11,7 +11,7 @@ flowchart LR
   U[User / Copilot Chat] --> C["MCP Client (stdio)"]
   C --> S["MCAPS Copilot Tools MCP Server\n(mcp-server/src/index.js)"]
 
-  C --> F["Local Filesystem Control Plane\n(.agent-memory + .vscode overlays)"]
+  C --> F["Local Filesystem Control Plane\n(Obsidian vault + .vscode overlays)"]
 
   S --> T["Tool Router\n(registerTools in src/tools.js)"]
   T --> A["Auth Service\n(src/auth.js)\nAzure CLI token (az account get-access-token)"]
@@ -30,9 +30,20 @@ flowchart LR
 
 For this repository, orchestration state is intentionally local-first and workspace-bound.
 
-- `.agent-memory/` stores session/working/durable memory used to continue and shape runs.
+- **Obsidian vault** (`mcp-obsidian`) is the durable knowledge layer — customer context, decisions, agent insights, and Connect hooks are persisted here. See [`.github/instructions/obsidian-vault.instructions.md`](../.github/instructions/obsidian-vault.instructions.md) for the full vault protocol.
 - `.vscode/mcp.json` is the MCP baseline and `.vscode/mcp.runtime.overlay.json` is runtime delta.
-- Copilot CLI session continuity and UI hydration rely on these files, not a remote persistence service.
+- Copilot CLI session continuity relies on these files, not a remote persistence service.
+
+### Configuring Your Own Knowledge Layer
+
+The vault is optional. Without it, the agent operates statelessly (CRM-only). If you want persistent cross-session memory, you can:
+
+1. **Use Obsidian MCP** (recommended) — configure `mcp-obsidian` in `.vscode/mcp.json`. See the [README](../README.md#optional-obsidian-mcp-for-local-knowledge) for setup.
+2. **Bring your own MCP server** — any MCP server that provides read/write note operations works. Wire it into `.vscode/mcp.json` and update [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) to tell the agent how to use it.
+3. **Use Copilot instructions** — the agent's behavior is shaped by instruction files. See these examples for how persistence is wired into agent workflows:
+   - [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) — Tier 0 always-loaded rules, including the Knowledge Layer section
+   - [`.github/instructions/obsidian-vault.instructions.md`](../.github/instructions/obsidian-vault.instructions.md) — how vault reads/writes integrate with CRM workflows (VAULT-PREFETCH, VAULT-PROMOTE, etc.)
+   - [`.github/instructions/intent.instructions.md`](../.github/instructions/intent.instructions.md) — how the agent reasons across multiple mediums (CRM, M365, vault)
 
 ### Reliability Constraints
 

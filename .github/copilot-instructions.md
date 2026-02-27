@@ -2,16 +2,29 @@
 
 ## Intent (Resolve First)
 
-Before role mapping, tool selection, or any operational workflow, resolve against the overarching intent defined in `.github/instructions/intent.instructions.md`.
+The agent strengthens cross-role communication and strategic alignment for account teams. MSX is one medium — not the mission. For the full model (house metaphor, intelligence modes, relationship axes, anti-patterns), see `.github/instructions/intent.instructions.md`.
 
-The agent's primary purpose is to **enhance cross-role communication and strategic alignment** for account teams. MSX is one medium — not the mission. Every action should serve visibility, alignment, or risk awareness across roles and mediums (CRM, M365, agent memory, governance cadences).
+**Operational checklist — every request:**
+1. **Resolve order**: Intent → Role → Medium → Action → Risk check.
+2. **Cross-ref ≥2 mediums** for status/risk/next-steps (CRM + M365 or vault). State sources; flag stale or silent mediums.
+3. **Surface risk proactively** — even when not asked. One sentence, cite evidence, name the role to act, suggest minimum intervention.
+4. **Connect rooms**: Bring context from separated mediums/roles together so the full value reaches the person who needs it.
+5. **Match to availability**: Only promise synthesis for mediums confirmed queryable (see Medium Probe below).
+6. **Strategic lens** (when request touches account state): pipeline health · execution integrity · customer value · cross-role coverage · risk posture.
 
-When processing requests:
-1. Apply the intent resolution order (Intent → Role → Medium → Action → Risk check).
-2. Cross-reference multiple mediums when the question involves status, risk, or next steps.
-3. Surface risks and communication gaps proactively, even when not explicitly asked.
-4. Connect responses to strategic dimensions (pipeline health, execution integrity, customer value, cross-role coverage, risk posture) when the request touches account state.
-5. Think "rooms of the house" — bring context from separated rooms together so the full value reaches the person who needs it.
+## Medium Availability Probe
+
+At session start (or first account-team request), probe which mediums are queryable before promising cross-medium synthesis:
+
+| Medium | Probe | If unavailable |
+|---|---|---|
+| **CRM** | `crm_auth_status` or `crm_whoami` | Inform user; no CRM reads/writes this session |
+| **Vault** | `list_directory("Customers/")` via `mcp-obsidian` | Skip VAULT-PREFETCH; operate stateless; note reduced context |
+| **WorkIQ / M365** | `ask_work_iq` with a minimal scoped query | Skip M365 evidence layer; note communication gap detection is limited |
+
+- Cache probe results for the session — do not re-probe on every request.
+- Adjust synthesis depth to match available mediums. Two-medium answers are acceptable; single-medium answers must explicitly flag the gap.
+- Never fabricate cross-medium insights from a single source.
 
 ---
 
@@ -38,13 +51,26 @@ Use this repository as an MCP-first workflow.
 - For read flows, use MCP tools such as `crm_auth_status`, `crm_whoami`, `crm_query`, `crm_get_record`, `get_milestones`, and `get_milestone_activities`.
 - Before using `crm_query` or `crm_get_record` with property names you are not certain about, call `crm_list_entity_properties` first to discover valid property names. Never guess CRM property names — refer to `.github/instructions/crm-entity-schema.instructions.md` or use the metadata tool.
 - For write-intent flows, follow role mapping + confirmation gate from `.github/instructions/msx-role-and-write-gate.instructions.md` before any create/update/close operation.
+- **Deal team queries**: The opportunity-level deal team is NOT retrievable via current MCP tools. When users ask about deal team membership, inform them of this limitation, offer milestone ownership as a partial proxy (`get_my_active_opportunities` or `get_milestones`), and suggest checking the MSX UI directly. See `.github/instructions/crm-entity-schema.instructions.md` § "Deal Team" for full details.
 - Treat local Node scripts as last-resort diagnostics only when MCP tooling is unavailable or explicitly requested by the user.
 
 ### CRM Read Query Scoping (Scope-Before-Retrieve)
 
 **Never call `get_milestones` with `mine: true` (or no filters) as the first action.** This returns _all_ milestones for the user and produces massive payloads (500KB+). Always narrow scope before retrieval.
 
-**Step 1 — Clarify intent.** Before any milestone/task/opportunity read, ask clarifying questions to narrow scope:
+**Step 0 — VAULT-PREFETCH (mandatory when `mcp-obsidian` is available).** Before asking the user scoping questions or calling any CRM tool, check the Obsidian vault for the customer:
+1. Call `list_directory("Customers/")` to confirm vault availability and list the active customer roster.
+2. If the user named a customer (or you can infer one), call `read_note("Customers/<Name>.md")` to extract:
+   - **Opportunity GUIDs** from the `## Opportunities` section — use these directly in CRM queries (`_msp_opportunityid_value eq '<GUID>'`) instead of running discovery queries.
+   - **Account TPID / Account ID** from frontmatter — use for `crm_query` account filters.
+   - **Team composition** — know who owns what before querying milestones.
+   - **Prior Agent Insights** — avoid redundant queries for information already validated.
+3. If vault has the opportunity GUID(s), **skip Step 1** (no need to ask the user for IDs you already have) and go directly to Step 2/3 with vault-provided IDs.
+4. If vault is unavailable or the customer has no vault file, fall through to Step 1.
+
+⚠️ **Do NOT skip this step when `mcp-obsidian` is available.** The vault is the primary source for customer→opportunity ID mapping. Going straight to CRM discovery queries when the vault has the answer wastes API calls and returns oversized payloads.
+
+**Step 1 — Clarify intent (if vault didn't fully resolve scope).** Ask clarifying questions to narrow scope:
 - Which opportunity or customer? (name or ID)
 - Which milestone status? (e.g., active, at risk, overdue, completed)
 - What time range? (e.g., this quarter, next 30 days)
@@ -85,6 +111,9 @@ Use this repository as an MCP-first workflow.
 - ❌ `crm_query` with `msp_forecastedconsumptionrecurring` in select — field does not exist
 - ❌ `crm_query` with `msp_estimatedcompletiondate` in select/filter — field does not exist on milestone; use `msp_milestonedate`
 - ❌ Loop: `list_opportunities` per customer → `get_milestones` per opp → `get_milestone_activities` per milestone (~30 calls)
+- ❌ Skipping vault: user says "check Contoso milestones" → agent calls `list_opportunities({ customerKeyword: "Contoso" })` without first reading `Customers/Contoso.md` from vault
+- ❌ Ignoring vault IDs: vault `Customers/Contoso.md` has opportunity GUID → agent still runs `crm_query` on `accounts` to find the account → then queries `opportunities` to find the GUID
+- ✅ Vault-first: user says "check Contoso milestones" → `read_note("Customers/Contoso.md")` → extract opportunity GUID → `crm_query` with `_msp_opportunityid_value eq '<GUID>'` (2 calls, precise)
 - ✅ `find_milestones_needing_tasks({ customerKeywords: ["Contoso", "Fabrikam", "Northwind"] })` (1 call)
 - ✅ `crm_query({ entitySet: "msp_engagementmilestones", filter: "_msp_opportunityid_value eq '...' and msp_milestonestatus eq 861980000", top: 25 })` (filtered, efficient)
 - ✅ `get_milestone_activities({ milestoneIds: ["ms1", "ms2", "ms3"] })` (1 call instead of 3)
@@ -95,34 +124,22 @@ Use this repository as an MCP-first workflow.
 - Use `.github/skills/WorkIQ_Query_Scoping_SKILL.md` as the canonical execution playbook for fact mapping, clarifying questions, defaults, two-pass retrieval, and sensitivity boundaries.
 - If role mapping and WorkIQ scoping both apply, resolve role first, then apply WorkIQ scoping before retrieval.
 
-## Knowledge Layers (Vault + Agent Memory)
+## Knowledge Layer (Vault)
 
-The agent operates with two knowledge layers. The Obsidian vault is the **primary** local knowledge store; `.agent-memory/` handles transient session/working state.
+The Obsidian vault (`mcp-obsidian`) is the agent's **sole configured knowledge store** for customer context, decisions, and durable memory. There is no built-in secondary memory layer — if the vault is unavailable, the agent operates statelessly (CRM-only), and users can configure their own persistence layer as they see fit.
 
-### Obsidian Vault (Primary — `mcp-obsidian`)
+### Obsidian Vault (`mcp-obsidian`)
 
 - The vault defines the **active customer roster** — only customers with `Customers/<Name>.md` files are in scope for proactive workflows.
-- **Before CRM queries**: read vault customer files for context (team, opportunities, prior findings) to scope queries. Don't query CRM blind when the vault tells you who matters.
-- **After CRM workflows**: promote validated findings to the vault (`## Agent Insights` on the customer file).
-- **Vault scopes, CRM validates**: use vault for *who/what/why* context; use CRM for *current state* data. Never substitute cached vault data for live CRM status on complex operations (writes, risk assessment, governance).
+- **Vault Protocol Phases**: Use the named phases (VAULT-PREFETCH, VAULT-CORRELATE, VAULT-PROMOTE, VAULT-HYGIENE) defined in `obsidian-vault.instructions.md` § Vault Protocol Phases. All phases are conditional — skipped automatically if `mcp-obsidian` is unavailable.
+- **Before CRM queries (MANDATORY)**: read vault `Customers/<Name>.md` to extract opportunity GUIDs, account IDs, and team context. Use these IDs directly in CRM queries — do NOT run CRM discovery queries (e.g., `list_opportunities`, `crm_query` on `accounts`) for customers that have vault files with IDs already stored. The vault is the customer→MSX ID bridge.
+- **After CRM workflows**: promote validated findings to the vault (`## Agent Insights` on the customer file). If you discovered new opportunity GUIDs or IDs during the workflow, add them to the customer's `## Opportunities` section so future queries can use them directly.
+- **Vault scopes, CRM validates**: use vault for *who/what/why* context and **identifier resolution**; use CRM for *current state* data. Never substitute cached vault data for live CRM status on complex operations (writes, risk assessment, governance).
 - See `.github/instructions/obsidian-vault.instructions.md` for full conventions, freshness rules, and workflow integration.
 
-### Agent Memory (Session + Working — `.agent-memory/`)
+### No Vault? No Problem
 
-- Use `.agent-memory/session/` and `.agent-memory/working/` for transient context within and across sessions.
-- Retrieve in order: `session` → `working`. Durable promotion goes to the vault when available.
-- `.agent-memory/working/customer-visit-log.json` tracks recent CRM sessions; read before new queries, append after.
-- If the vault is unavailable, `.agent-memory/durable/` serves as fallback durable storage.
-- Do not store secrets, tokens, or credentials in agent memory.
-
-### Memory CLI
-
-- Use local scripts from `mcp-server` for memory operations:
-	- `npm run memory:add -- --scope working --kind fact --summary "..." --content "..."`
-	- `npm run memory:find -- --query "..." --scope working --limit 8 --tokenBudget 1200`
-	- `npm run memory:promote -- --id <memoryId> --fromScope session`
-	- `npm run memory:weekly` (weekly dry-run compaction report)
-	- `npm run memory:weekly:apply` (weekly apply-mode compaction)
+If `mcp-obsidian` is not configured, the agent works fine — it just loses persistent memory across sessions. CRM is always the source of truth for live state. Users who want cross-session context without Obsidian can bring their own persistence layer (local files, another MCP server, etc.). The agent does not assume any specific fallback directory structure.
 
 ## Connect Hooks (Evidence Capture)
 

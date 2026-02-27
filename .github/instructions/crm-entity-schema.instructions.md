@@ -176,6 +176,35 @@ The `get_milestones` tool only accepts these parameters (defined in `mcp-server/
 - `taskFilter` — not supported; use `get_milestone_activities` after retrieving milestones
 - `format` — not supported
 
+## Deal Team: Opportunity vs. Milestone Ownership
+
+MSX has **two distinct deal team concepts** that are often conflated. The agent must distinguish them clearly.
+
+### Opportunity Deal Team (NOT reliably retrievable)
+The formal deal team lives at the **opportunity level**. Being on the opportunity deal team grants visibility and accountability for the entire opportunity. This is the deal team users typically mean when they say "deal team."
+
+**Current limitation:** We do NOT have a reliable MCP tool or OData query pattern to fetch the opportunity deal team roster. The underlying entity/relationship for opportunity deal team members is not exposed through the standard OData entity sets available to us.
+
+When a user asks "who is on the deal team?" or "am I on the deal team?" for an opportunity:
+- Acknowledge that **opportunity-level deal team membership cannot be reliably retrieved** via current tooling.
+- Suggest the user check the deal team directly in the MSX UI (Opportunity → Deal Team tab).
+- Offer to show **milestone ownership** as a partial proxy (see below).
+
+### Milestone Deal Team (retrievable via `_ownerid_value`)
+Each engagement milestone has an **owner** (`_ownerid_value` on `msp_engagementmilestones`). Owning a milestone means you are part of the milestone-level execution team.
+
+**Key distinction:** Being assigned as a milestone owner does **NOT** automatically add you to the opportunity deal team. These are separate relationships in MSX.
+
+The `get_my_active_opportunities` tool uses milestone ownership as a **heuristic** to infer deal team membership — it finds opportunities where the user owns milestones and tags them as `relationship: 'deal-team'`. This is useful but not equivalent to the real opportunity deal team.
+
+### What we CAN do
+| Question | Tool / Approach | Reliability |
+|---|---|---|
+| Who owns milestones on this opportunity? | `get_milestones({ opportunityId })` → `_ownerid_value` | Reliable |
+| Which opportunities am I involved in? | `get_my_active_opportunities()` | Reliable (owner + milestone heuristic) |
+| Who is on the opportunity deal team? | ❌ Not available via MCP | Cannot retrieve |
+| Am I on the opportunity deal team? | ❌ Not available via MCP | Cannot retrieve |
+
 ## Dynamic Schema Discovery
 When a property is not listed above, use the `crm_list_entity_properties` MCP tool:
 ```

@@ -103,9 +103,13 @@ export function createAuthService({ crmUrl, tenantId }) {
           else reject(new Error('Azure CLI returned empty token'));
         } else {
           if (stderr.includes('AADSTS') || stderr.includes('login')) {
-            reject(new Error('Not logged in. Run "az login" first.'));
+            reject(new Error(
+              'Azure CLI session expired. Run "az login --tenant ' + tenant + '" in your terminal, then retry.'
+            ));
           } else if (stderr.includes('tenant')) {
-            reject(new Error('Invalid tenant or no access.'));
+            reject(new Error(
+              'Invalid tenant or no access. Run "az login --tenant ' + tenant + '" to re-authenticate.'
+            ));
           } else {
             reject(new Error(`Azure CLI error: ${stderr || 'Unknown error'}`));
           }
@@ -113,9 +117,25 @@ export function createAuthService({ crmUrl, tenantId }) {
       });
     });
 
+  const isTokenUsable = () => {
+    if (!state.token || !state.metadata) return false;
+    // Re-evaluate expiration against current time (metadata.expiresAt is a Date)
+    if (state.metadata.expiresAt) {
+      const remainingMs = state.metadata.expiresAt.getTime() - Date.now();
+      // Refresh if expired or expiring within 2 minutes
+      if (remainingMs < 120_000) return false;
+    }
+    return true;
+  };
+
+  const clearToken = () => {
+    state.token = null;
+    state.metadata = null;
+  };
+
   const ensureAuth = async (settings = {}) => {
-    // If we have a non-expired token, reuse it
-    if (state.token && state.metadata && !state.metadata.isExpired) {
+    // If we have a token with sufficient remaining lifetime, reuse it
+    if (isTokenUsable()) {
       return { success: true, metadata: { ...state.metadata } };
     }
 
@@ -140,5 +160,5 @@ export function createAuthService({ crmUrl, tenantId }) {
     state.metadata ? { ...state.metadata } : { isAuthenticated: false };
   const getCrmUrl = () => state.crmUrl;
 
-  return { ensureAuth, getToken, getAuthStatus, getCrmUrl, _state: state };
+  return { ensureAuth, getToken, getAuthStatus, getCrmUrl, clearToken, _state: state };
 }

@@ -48,12 +48,15 @@ export function translateSdkToAgUi(event: SessionEvent, runId: string): ReturnTy
       });
 
     case 'tool.execution_complete':
+      // NOTE: This path is bypassed by copilot-handlers.ts which constructs
+      // an enriched TOOL_CALL_END with the real toolName + durationMs from
+      // the pendingToolCalls map. Kept as a fallback for direct translator use.
       return createAgUiEvent(AgUiEventType.TOOL_CALL_END, runId, {
-        toolName: '', // Not available on completion events
+        toolName: '', // Resolved by copilot-handlers from pendingToolCalls
         callId: event.data.toolCallId,
         result: event.data.result?.content ?? null,
         status: event.data.success ? 'success' : 'error',
-        durationMs: 0,
+        durationMs: 0, // Computed by copilot-handlers from start timestamp
       });
 
     case 'session.error':
