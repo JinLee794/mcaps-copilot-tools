@@ -2,6 +2,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { AgUiEvent } from '../shared/types/AgUiEvent';
 
+export interface SessionMeta {
+  id: string;
+  skillId: string;
+  createdAt: string;
+  lastActiveAt: string;
+  messageCount: number;
+  title: string;
+}
+
 export interface ElectronAPI {
   auth: {
     azRefresh: () => Promise<{ ok: boolean; user?: string; error?: string }>;
@@ -11,6 +20,12 @@ export interface ElectronAPI {
     cancel: (runId: string) => Promise<void>;
     captureWorkflow: () => Promise<unknown>;
     onEvent: (callback: (event: AgUiEvent) => void) => () => void;
+  };
+  sessions: {
+    list: () => Promise<{ sessions: SessionMeta[] }>;
+    getActive: () => Promise<{ session: SessionMeta | null }>;
+    newSession: () => Promise<{ ok: boolean }>;
+    resume: (sessionId: string) => Promise<{ ok: boolean; session?: SessionMeta; error?: string }>;
   };
   mcp: {
     listTools: () => Promise<{ tools: Array<{ name: string; description: string; server: string }> }>;
@@ -46,6 +61,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('ag-ui:event', handler);
       return () => ipcRenderer.removeListener('ag-ui:event', handler);
     },
+  },
+  sessions: {
+    list: () => ipcRenderer.invoke('copilot:list-sessions'),
+    getActive: () => ipcRenderer.invoke('copilot:get-active-session'),
+    newSession: () => ipcRenderer.invoke('copilot:new-session'),
+    resume: (sessionId: string) => ipcRenderer.invoke('copilot:resume-session', { sessionId }),
   },
   mcp: {
     listTools: () => ipcRenderer.invoke('mcp:list-tools'),

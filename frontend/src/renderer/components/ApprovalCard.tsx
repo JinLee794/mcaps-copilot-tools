@@ -1,6 +1,6 @@
 // ApprovalCard — HITL confirmation gate before write operations (§6.3)
 import React, { useState } from 'react';
-import { ShieldAlert, Check, Pencil, X } from 'lucide-react';
+import { ShieldAlert, Check, X } from 'lucide-react';
 
 interface DiffRow {
   field: string;
@@ -25,21 +25,9 @@ export function ApprovalCard({
   onApprove,
   onSkip,
 }: ApprovalCardProps) {
-  const [editing, setEditing] = useState(false);
-  const [editedJson, setEditedJson] = useState(() =>
-    proposedArgs ? JSON.stringify(proposedArgs, null, 2) : '',
-  );
-  const [parseError, setParseError] = useState<string | null>(null);
-
-  const handleEditApprove = () => {
-    try {
-      const parsed = JSON.parse(editedJson) as Record<string, unknown>;
-      setParseError(null);
-      onApprove(parsed);
-    } catch {
-      setParseError('Invalid JSON');
-    }
-  };
+  // SDK limitation: PermissionRequestResult doesn't support passing back
+  // modified arguments. The Edit button is removed per spec §5.6.
+  const [showArgs, setShowArgs] = useState(false);
 
   return (
     <div className="approval-card">
@@ -54,7 +42,7 @@ export function ApprovalCard({
         </div>
 
         {/* Diff preview table */}
-        {diffPreview && diffPreview.length > 0 && !editing && (
+        {diffPreview && diffPreview.length > 0 && (
           <table className="approval-diff-table">
             <thead>
               <tr>
@@ -75,42 +63,17 @@ export function ApprovalCard({
           </table>
         )}
 
-        {/* Proposed args (fallback when no diff, or when editing) */}
-        {editing ? (
-          <div>
-            <textarea
-              className="approval-args-editor"
-              value={editedJson}
-              onChange={(e) => { setEditedJson(e.target.value); setParseError(null); }}
-              rows={8}
-              spellCheck={false}
-            />
-            {parseError && (
-              <div style={{ color: 'var(--accent-red)', fontSize: 11, marginTop: 4 }}>
-                {parseError}
-              </div>
-            )}
-          </div>
-        ) : (
-          !diffPreview && proposedArgs && Object.keys(proposedArgs).length > 0 && (
-            <pre className="approval-args">{JSON.stringify(proposedArgs, null, 2)}</pre>
-          )
+        {/* Proposed args (fallback when no diff preview is available) */}
+        {!diffPreview && proposedArgs && Object.keys(proposedArgs).length > 0 && (
+          showArgs
+            ? <pre className="approval-args">{JSON.stringify(proposedArgs, null, 2)}</pre>
+            : <button className="btn-secondary" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => setShowArgs(true)}>Show raw args</button>
         )}
       </div>
       <div className="approval-actions">
-        <button className="btn-primary" onClick={() => editing ? handleEditApprove() : onApprove()}>
-          <Check size={14} /> {editing ? 'Save & Approve' : 'Approve'}
+        <button className="btn-primary" onClick={() => onApprove()}>
+          <Check size={14} /> Approve
         </button>
-        {proposedArgs && !editing && (
-          <button className="btn-secondary" onClick={() => setEditing(true)}>
-            <Pencil size={14} /> Edit
-          </button>
-        )}
-        {editing && (
-          <button className="btn-secondary" onClick={() => { setEditing(false); setParseError(null); }}>
-            Cancel Edit
-          </button>
-        )}
         <button className="btn-secondary" onClick={onSkip}>
           <X size={14} /> Skip
         </button>

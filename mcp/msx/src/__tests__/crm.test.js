@@ -5,7 +5,8 @@ function mockAuthService(token = 'test-token') {
   return {
     ensureAuth: vi.fn().mockResolvedValue({ success: true }),
     getToken: vi.fn().mockReturnValue(token),
-    getCrmUrl: vi.fn().mockReturnValue('https://test.crm.dynamics.com')
+    getCrmUrl: vi.fn().mockReturnValue('https://test.crm.dynamics.com'),
+    clearToken: vi.fn()
   };
 }
 
@@ -106,6 +107,39 @@ describe('createCrmClient', () => {
     expect(result.ok).toBe(true);
     expect(result.data.value).toHaveLength(2);
     expect(result.data.value.map(r => r.id)).toEqual([1, 2]);
+  });
+
+  it('request — retries with fresh token on 401', async () => {
+    const err401 = new Error('Unauthorized');
+    err401.status = 401;
+
+    fetchMock
+      // First call fails with 401
+      .mockRejectedValueOnce(err401)
+      // Retry succeeds after re-auth
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({ value: [{ id: 1 }] })
+      });
+
+    const result = await client.request('WhoAmI');
+    expect(auth.clearToken).toHaveBeenCalledOnce();
+    expect(auth.ensureAuth).toHaveBeenCalledTimes(2);
+    expect(result.ok).toBe(true);
+  });
+
+  it('request — does not retry 401 more than once', async () => {
+    const err401 = new Error('Unauthorized');
+    err401.status = 401;
+
+    fetchMock.mockRejectedValue(err401);
+
+    const result = await client.request('WhoAmI');
+    expect(auth.clearToken).toHaveBeenCalledOnce();
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(401);
   });
 
   it('buildUrl — constructs correct OData URL', () => {

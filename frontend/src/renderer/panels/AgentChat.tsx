@@ -1,12 +1,13 @@
 // Agent Chat — unified message timeline with inline tool calls + HITL approval (§5.3)
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { MessageSquare, Bot, SendHorizonal, Wrench, Loader2, CheckCircle2, XCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { MessageSquare, Bot, SendHorizonal, Wrench, Loader2, CheckCircle2, XCircle, ChevronDown, ChevronRight, Plus, History, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ApprovalCard } from '../components/ApprovalCard';
 import { CliActivityStream } from '../components/CliActivityStream';
+import { ToolResultView } from '../components/ToolResultView';
 import { useAgentState, useAgUiEvents } from '../hooks/useAgUiTransport';
 import type { ToolCallEntry } from '../components/ToolCallLog';
-import type { ElectronAPI } from '../../main/preload';
+import type { ElectronAPI, SessionMeta } from '../../main/preload';
 
 declare global {
   interface Window {
@@ -28,9 +29,19 @@ type TimelineItem =
 export function AgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
+  const [showSessionDrawer, setShowSessionDrawer] = useState(false);
+  const [sessionList, setSessionList] = useState<SessionMeta[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [activeSessionTitle, setActiveSessionTitle] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { state } = useAgentState();
   const { toolCalls, interrupt, streamingText, cliActivity } = useAgUiEvents();
+
+  // Track session ID from STATE_DELTA events
+  useEffect(() => {
+    if (state.sessionId) setActiveSessionId(state.sessionId as string);
+    if (state.sessionTitle) setActiveSessionTitle(state.sessionTitle as string);
+  }, [state.sessionId, state.sessionTitle]);
 
   // Append or update the assistant message as streaming text arrives
   useEffect(() => {
@@ -118,18 +129,107 @@ export function AgentChat() {
     [cliActivity],
   );
 
+  // Session management
+  const handleNewSession = useCallback(async () => {
+    if (window.electronAPI) {
+      await window.electronAPI.sessions.newSession();
+      setMessages([]);
+      setActiveSessionId(null);
+      setActiveSessionTitle(null);
+    }
+  }, []);
+
+  const loadSessionList = useCallback(async () => {
+    if (window.electronAPI) {
+      const { sessions } = await window.electronAPI.sessions.list();
+      setSessionList(sessions);
+    }
+  }, []);
+
+  const handleToggleSessionDrawer = useCallback(async () => {
+    if (!showSessionDrawer) await loadSessionList();
+    setShowSessionDrawer((v) => !v);
+  }, [showSessionDrawer, loadSessionList]);
+
+  const handleResumeSession = useCallback(async (sessionId: string) => {
+    if (!window.electronAPI) return;
+    const result = await window.electronAPI.sessions.resume(sessionId);
+    if (result.ok && result.session) {
+      setMessages([]);
+      setActiveSessionId(result.session.id);
+      setActiveSessionTitle(result.session.title);
+      setShowSessionDrawer(false);
+    }
+  }, []);
+
   return (
     <>
       <div className="panel-header">
-        <span>Agent Chat</span>
-        <button
-          className="btn-secondary"
-          style={{ width: 'auto', padding: '2px 8px', marginTop: 0 }}
-          onClick={() => setMessages([])}
-        >
-          Clear
-        </button>
+        <span>
+          Agent Chat
+          {activeSessionTitle && (
+            <span className="session-badge" title={`Session: ${activeSessionId}`}>
+              {activeSessionTitle.length > 40 ? activeSessionTitle.slice(0, 40) + '…' : activeSessionTitle}
+            </span>
+          )}
+        </span>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button
+            className="btn-secondary"
+            style={{ width: 'auto', padding: '2px 8px', marginTop: 0 }}
+            onClick={handleToggleSessionDrawer}
+            title="Session history"
+          >
+            <History size={14} />
+          </button>
+          <button
+            className="btn-secondary"
+            style={{ width: 'auto', padding: '2px 8px', marginTop: 0 }}
+            onClick={handleNewSession}
+            title="New session"
+          >
+            <Plus size={14} />
+          </button>
+          <button
+            className="btn-secondary"
+            style={{ width: 'auto', padding: '2px 8px', marginTop: 0 }}
+            onClick={() => setMessages([])}
+          >
+            Clear
+          </button>
+        </div>
       </div>
+
+      {/* Session history drawer */}
+      {showSessionDrawer && (
+        <div className="session-drawer">
+          <div className="session-drawer-header">
+            <span>Previous Sessions</span>
+            <button className="btn-icon" onClick={() => setShowSessionDrawer(false)}>
+              <X size={14} />
+            </button>
+          </div>
+          <div className="session-drawer-list">
+            {sessionList.length === 0 && (
+              <div className="empty-state" style={{ padding: '16px 0' }}>
+                <div className="empty-state-text">No previous sessions</div>
+              </div>
+            )}
+            {sessionList.map((s) => (
+              <button
+                key={s.id}
+                className={`session-drawer-item ${s.id === activeSessionId ? 'active' : ''}`}
+                onClick={() => handleResumeSession(s.id)}
+              >
+                <div className="session-drawer-item-title">{s.title}</div>
+                <div className="session-drawer-item-meta">
+                  {s.messageCount} msg · {s.skillId} · {new Date(s.lastActiveAt).toLocaleDateString()}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Chronological timeline */}
       <div className="chat-messages">
@@ -234,7 +334,9 @@ function InlineToolCall({ call }: { call: ToolCallEntry }) {
         </span>
         <span className="tool-inline-name">{call.name}</span>
         {call.durationMs != null && call.durationMs > 0 && (
-          <span className="tool-inline-duration">{call.durationMs}ms</span>
+          <span className="tool-inline-duration">
+            {call.durationMs < 1000 ? `${call.durationMs}ms` : `${(call.durationMs / 1000).toFixed(1)}s`}
+          </span>
         )}
         <span className="tool-inline-expand">
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -251,9 +353,7 @@ function InlineToolCall({ call }: { call: ToolCallEntry }) {
           {call.result !== undefined && (
             <div className="tool-inline-section">
               <span className="tool-inline-section-label">Result</span>
-              <pre className="tool-inline-pre">
-                {typeof call.result === 'string' ? call.result : JSON.stringify(call.result, null, 2)}
-              </pre>
+              <ToolResultView toolName={call.name} result={call.result} />
             </div>
           )}
           {!call.args && call.result === undefined && (

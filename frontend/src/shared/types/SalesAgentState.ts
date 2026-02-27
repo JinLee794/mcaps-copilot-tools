@@ -167,6 +167,13 @@ export interface SalesAgentState {
   status: 'idle' | 'running' | 'paused' | 'complete' | 'error';
   progress: number;
 
+  /** Active copilot session ID (persisted across messages) */
+  sessionId?: string;
+  /** Human-readable session title (derived from first message) */
+  sessionTitle?: string;
+  /** Number of messages sent in the active session */
+  messageCount?: number;
+
   sources: {
     transcripts: SourceNode;
     emails: SourceNode;

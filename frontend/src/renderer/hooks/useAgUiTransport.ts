@@ -30,6 +30,30 @@ interface AgUiTransportValue {
   cliActivity: CliActivityEntry[];
 }
 
+/** Deep-merge a partial delta into the agent state, preserving sibling keys at each level. */
+function deepMergeState(target: SalesAgentState, delta: Record<string, unknown>): SalesAgentState {
+  const result: Record<string, unknown> = { ...target };
+  for (const [key, value] of Object.entries(delta)) {
+    const existing = result[key];
+    if (
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      existing !== null &&
+      typeof existing === 'object' &&
+      !Array.isArray(existing)
+    ) {
+      result[key] = deepMergeState(
+        existing as SalesAgentState,
+        value as Record<string, unknown>,
+      );
+    } else {
+      result[key] = value;
+    }
+  }
+  return result as unknown as SalesAgentState;
+}
+
 const AgUiTransportContext = createContext<AgUiTransportValue | null>(null);
 
 /**
@@ -110,10 +134,23 @@ export function AgUiTransportProvider({ children }: { children: React.ReactNode 
         case 'TOOL_CALL_END': {
           const callId = String(d['callId'] ?? d['toolCallId'] ?? '');
           const status = d['status'] === 'error' ? 'error' as const : 'success' as const;
+          const resolvedName = d['toolName'] ? String(d['toolName']) : '';
+          const durationMs = typeof d['durationMs'] === 'number' ? d['durationMs'] : undefined;
+          const errorInfo = (d['errorInfo'] ?? undefined) as ToolCallEntry['errorInfo'];
+          const summary = d['summary'] ? String(d['summary']) : undefined;
           setToolCalls((prev) =>
             prev.map((tc) =>
               tc.id === callId
-                ? { ...tc, status, result: d['result'] }
+                ? {
+                    ...tc,
+                    status,
+                    result: d['result'],
+                    // Backfill name if the START event had it but END didn't (or vice versa)
+                    name: tc.name || resolvedName,
+                    durationMs: durationMs ?? tc.durationMs,
+                    errorInfo,
+                    summary,
+                  }
                 : tc,
             ),
           );
@@ -121,7 +158,7 @@ export function AgUiTransportProvider({ children }: { children: React.ReactNode 
         }
 
         case 'STATE_DELTA':
-          setState((prev) => ({ ...prev, ...d as Partial<SalesAgentState> }));
+          setState((prev) => deepMergeState(prev, d as Record<string, unknown>));
           // If status changed away from 'paused', clear the interrupt card
           if ((d as Partial<SalesAgentState>).status && (d as Partial<SalesAgentState>).status !== 'paused') {
             setInterrupt(null);
