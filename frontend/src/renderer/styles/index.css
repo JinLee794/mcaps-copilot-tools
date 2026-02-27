@@ -2692,3 +2692,184 @@ td.cell-name {
   color: var(--text-muted);
   margin-top: 2px;
 }
+
+/* ── Single chat layout (Copilot CLI style) ───────────────────────────── */
+
+.single-chat-layout {
+  display: block;
+}
+
+.panel-chat-full {
+  width: 100%;
+  border-right: none;
+}
+
+.chat-top-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.chat-layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.chat-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages-centered {
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.prompt-first-empty {
+  min-height: 52%;
+}
+
+.centered-input-area {
+  border-top: none;
+}
+
+.centered-chat-input-wrapper {
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.centered-chat-input {
+  border-radius: 999px;
+  padding: 11px 16px;
+}
+
+.obsidian-note-strip {
+  border-top: 1px solid var(--border-color);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.obsidian-note-strip-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.obsidian-note-titles {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.obsidian-note-pill {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.obsidian-note-pill:hover,
+.obsidian-note-pill.active {
+  color: var(--text-primary);
+  border-color: var(--accent-blue);
+}
+
+.obsidian-note-panel {
+  width: 360px;
+  border-left: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+}
+
+.obsidian-note-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.obsidian-note-panel-body {
+  padding: 12px;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* ── AG-UI result cards ───────────────────────────────────────────────── */
+
+.tool-result-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tool-result-row-card,
+.tool-result-opportunity-card,
+.tool-result-person-card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--bg-primary);
+}
+
+.tool-result-row-main,
+.tool-result-opportunity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tool-result-row-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tool-result-row-meta,
+.tool-result-opportunity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 8px;
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.tool-result-row-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tool-result-action-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.tool-result-action-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-blue);
+}

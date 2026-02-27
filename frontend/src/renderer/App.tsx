@@ -1,19 +1,13 @@
 // Renderer entry — three-panel layout with IPC-based transport (§4, §8)
 import React from 'react';
-import { Sparkles, Server, Terminal, Activity, RefreshCw } from 'lucide-react';
-import { SkillsPanel } from './panels/SkillsPanel';
-import { ResearchCanvas } from './panels/ResearchCanvas';
+import { Sparkles, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { AgentChat } from './panels/AgentChat';
 import { McpInspector } from './panels/McpInspector';
-import { MilestonesPanel } from './panels/MilestonesPanel';
 import { AgUiTransportProvider, useAgUiTransport } from './hooks/useAgUiTransport';
 import './styles/index.css';
 
-type CanvasView = 'research' | 'milestones';
-
 function AppShell() {
   const [showMcpInspector, setShowMcpInspector] = React.useState(false);
-  const [canvasView, setCanvasView] = React.useState<CanvasView>('research');
   const [azRefreshing, setAzRefreshing] = React.useState(false);
   const transport = useAgUiTransport();
 
@@ -36,6 +30,14 @@ function AppShell() {
             <h1 className="app-title">Copilot Sales Assistant</h1>
           </div>
           <div className="header-right">
+            <span className="connection-status">
+              <span className={`status-dot ${transport.connected ? 'connected' : 'disconnected'}`} />
+              Copilot {transport.connected ? 'Connected' : 'Connecting...'}
+            </span>
+            <span className="connection-status">
+              <span className="status-dot connected" />
+              Azure
+            </span>
             <button
               className="header-btn"
               onClick={handleAzRefresh}
@@ -43,55 +45,20 @@ function AppShell() {
               title="Refresh Azure CLI credentials"
             >
               <RefreshCw size={14} className={azRefreshing ? 'spin' : ''} />
-              {azRefreshing ? 'Signing in...' : 'Az Login'}
+              {azRefreshing ? 'Signing in...' : 'Run az login'}
             </button>
-            <span className="connection-status">
-              <span className={`status-dot ${transport.connected ? 'connected' : 'disconnected'}`} />
-              {transport.connected ? 'Connected' : 'Connecting...'}
-            </span>
+            <button className="header-btn" onClick={() => setShowMcpInspector(true)} title="Open quick actions">
+              <SlidersHorizontal size={14} />
+              Quick Actions
+            </button>
           </div>
         </header>
 
-        {/* Three-panel layout: Skills 20% · Canvas 50% · Chat 30% */}
-        <main className="panels-container">
-          <div className="panel panel-skills">
-            <SkillsPanel onOpenMcpInspector={() => setShowMcpInspector(true)} />
-          </div>
-          <div className="panel panel-canvas">
-            {/* Canvas view switcher */}
-            <div className="canvas-tabs">
-              <button
-                className={`canvas-tab ${canvasView === 'research' ? 'active' : ''}`}
-                onClick={() => setCanvasView('research')}
-              >
-                Research
-              </button>
-              <button
-                className={`canvas-tab ${canvasView === 'milestones' ? 'active' : ''}`}
-                onClick={() => setCanvasView('milestones')}
-              >
-                Milestones
-              </button>
-            </div>
-            {canvasView === 'research' ? <ResearchCanvas /> : <MilestonesPanel />}
-          </div>
-          <div className="panel panel-chat">
+        <main className="panels-container single-chat-layout">
+          <div className="panel panel-chat-full">
             <AgentChat />
           </div>
         </main>
-
-        {/* Status bar */}
-        <footer className="status-bar">
-          <span className="status-item" onClick={() => setShowMcpInspector(true)}>
-            <Server size={12} /> mcp.json: {transport.toolCalls.length} tool calls
-          </span>
-          <span className="status-item">
-            <Terminal size={12} /> Copilot CLI {transport.connected ? 'connected' : 'disconnected'}
-          </span>
-          <span className="status-item">
-            <Activity size={12} /> {transport.state.status}
-          </span>
-        </footer>
 
         {/* MCP Inspector modal */}
         {showMcpInspector && (

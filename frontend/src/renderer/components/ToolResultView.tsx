@@ -15,6 +15,7 @@ interface ToolResultViewProps {
 type ResultKind =
   | 'milestones'
   | 'opportunities'
+  | 'people'
   | 'tasks'
   | 'timeline'
   | 'cost-trend'
@@ -30,6 +31,7 @@ function detectResultKind(toolName: string): ResultKind {
   if (toolName === 'view_staged_changes_diff') return 'diff';
   if (['get_milestones', 'find_milestones_needing_tasks'].includes(toolName)) return 'milestones';
   if (['list_opportunities', 'get_my_active_opportunities'].includes(toolName)) return 'opportunities';
+  if (toolName.includes('people') || toolName === 'get_team_contacts') return 'people';
   if (toolName === 'get_milestone_activities') return 'tasks';
   if (['crm_whoami', 'crm_auth_status'].includes(toolName)) return 'scalar';
   return 'raw';
@@ -101,7 +103,7 @@ function shortDate(val: unknown): string {
 
 // ── Milestone Table ─────────────────────────────────────────────────
 
-function MilestoneResultTable({ records, compact }: { records: Record<string, unknown>[]; compact?: boolean }) {
+function MilestoneResultRows({ records, compact }: { records: Record<string, unknown>[]; compact?: boolean }) {
   if (records.length === 0) return <span className="tool-result-empty">No milestones</span>;
 
   // Summary line
@@ -117,44 +119,40 @@ function MilestoneResultTable({ records, compact }: { records: Record<string, un
   }
 
   return (
-    <div className="tool-result-table-wrap">
+    <div className="tool-result-cards">
       <div className="tool-result-summary">{summary}</div>
-      <table className="tool-result-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Monthly Use</th>
-            <th>Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {records.map((m, i) => {
-            const status = fv(m, 'msp_milestonestatus');
-            const statusClass =
-              status === 'At Risk' ? 'status-at-risk' :
-              status === 'Completed' ? 'status-completed' :
-              'status-active';
-            return (
-              <tr key={String(m['msp_engagementmilestoneid'] ?? i)}>
-                <td>{String(m['msp_milestonenumber'] ?? i + 1)}</td>
-                <td>{String(m['msp_name'] ?? '—')}</td>
-                <td><span className={`status-badge ${statusClass}`}>{status}</span></td>
-                <td>{currency(m['msp_monthlyuse'])}</td>
-                <td>{shortDate(m['msp_milestonedate'])}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      {records.map((m, i) => {
+        const status = fv(m, 'msp_milestonestatus');
+        const statusClass =
+          status === 'At Risk' ? 'status-at-risk' :
+          status === 'Completed' ? 'status-completed' :
+          'status-active';
+        return (
+          <div key={String(m['msp_engagementmilestoneid'] ?? i)} className="tool-result-row-card">
+            <div className="tool-result-row-main">
+              <span className="tool-result-row-title">{String(m['msp_milestonenumber'] ?? i + 1)} · {String(m['msp_name'] ?? '—')}</span>
+              <span className={`status-badge ${statusClass}`}>{status}</span>
+            </div>
+            <div className="tool-result-row-meta">
+              <span>Due {shortDate(m['msp_milestonedate'])}</span>
+              <span>Owner {fv(m, '_ownerid_value')}</span>
+              <span>Monthly {currency(m['msp_monthlyuse'])}</span>
+            </div>
+            <div className="tool-result-row-actions">
+              <button className="tool-result-action-btn">Update Task</button>
+              <button className="tool-result-action-btn">Edit Milestone</button>
+              <button className="tool-result-action-btn">View Tasks</button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 // ── Opportunity Table ───────────────────────────────────────────────
 
-function OpportunityResultTable({ records, compact }: { records: Record<string, unknown>[]; compact?: boolean }) {
+function OpportunityResultCards({ records, compact }: { records: Record<string, unknown>[]; compact?: boolean }) {
   if (records.length === 0) return <span className="tool-result-empty">No opportunities</span>;
 
   if (compact) {
@@ -163,27 +161,57 @@ function OpportunityResultTable({ records, compact }: { records: Record<string, 
   }
 
   return (
-    <div className="tool-result-table-wrap">
-      <table className="tool-result-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>ACR</th>
-            <th>Sales Play</th>
-            <th>Est. Close</th>
-          </tr>
-        </thead>
-        <tbody>
-          {records.map((o, i) => (
-            <tr key={String(o['opportunityid'] ?? i)}>
-              <td>{String(o['name'] ?? '—')}</td>
-              <td>{currency(o['msp_consumptionconsumedrecurring'])}</td>
-              <td>{String(o['msp_salesplay'] ?? '—')}</td>
-              <td>{shortDate(o['estimatedclosedate'])}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="tool-result-cards">
+      {records.map((o, i) => (
+        <div key={String(o['opportunityid'] ?? i)} className="tool-result-opportunity-card">
+          <div className="tool-result-opportunity-header">
+            <strong>{String(o['name'] ?? '—')}</strong>
+            <span className="status-badge status-active">{String(o['statecode@OData.Community.Display.V1.FormattedValue'] ?? o['statecode'] ?? 'Open')}</span>
+          </div>
+          <div className="tool-result-opportunity-grid">
+            <span>Owner: {fv(o, '_ownerid_value')}</span>
+            <span>Sales play: {String(o['msp_salesplay@OData.Community.Display.V1.FormattedValue'] ?? o['msp_salesplay'] ?? '—')}</span>
+            <span>Est. close: {shortDate(o['estimatedclosedate'])}</span>
+            <span>Est. completion: {shortDate(o['msp_estcompletiondate'])}</span>
+            <span>ACR: {currency(o['msp_consumptionconsumedrecurring'])}</span>
+          </div>
+          <div className="tool-result-row-actions">
+            <button className="tool-result-action-btn">Open Milestones</button>
+            <button className="tool-result-action-btn">Edit Opportunity</button>
+            <button className="tool-result-action-btn">Refresh</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function isPersonRecord(record: Record<string, unknown>): boolean {
+  return ['fullname', 'internalemailaddress', 'title', 'company', 'org'].some((f) => record[f] != null);
+}
+
+function PersonResultCards({ records, compact }: { records: Record<string, unknown>[]; compact?: boolean }) {
+  if (records.length === 0) return <span className="tool-result-empty">No people</span>;
+  if (compact) return <span className="tool-result-summary">{records.length} people found</span>;
+  return (
+    <div className="tool-result-cards">
+      {records.map((p, i) => (
+        <div key={String(p['systemuserid'] ?? p['id'] ?? i)} className="tool-result-person-card">
+          <div className="tool-result-opportunity-header">
+            <strong>{String(p['fullname'] ?? p['name'] ?? 'Unknown')}</strong>
+            <span>{String(p['title'] ?? '—')}</span>
+          </div>
+          <div className="tool-result-opportunity-grid">
+            <span>Email: {String(p['internalemailaddress'] ?? p['email'] ?? '—')}</span>
+            <span>Org: {String(p['org'] ?? p['company'] ?? '—')}</span>
+            <span>Customers: {Array.isArray(p['customers']) ? (p['customers'] as unknown[]).join(', ') : '—'}</span>
+          </div>
+          <div className="tool-result-row-actions">
+            <button className="tool-result-action-btn">Copy Contact</button>
+            <button className="tool-result-action-btn">Open Related Records</button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -432,15 +460,21 @@ export function ToolResultView({ toolName, result, compact }: ToolResultViewProp
 
   const records = extractRecords(parsed);
   const dataObj = typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {};
+  const hasPersonLikeRecords =
+    (records as Record<string, unknown>[]).length > 0 &&
+    (records as Record<string, unknown>[]).every((r) => isPersonRecord(r));
 
   let content: React.ReactNode;
 
   switch (kind) {
     case 'milestones':
-      content = <MilestoneResultTable records={records as Record<string, unknown>[]} compact={compact} />;
+      content = <MilestoneResultRows records={records as Record<string, unknown>[]} compact={compact} />;
       break;
     case 'opportunities':
-      content = <OpportunityResultTable records={records as Record<string, unknown>[]} compact={compact} />;
+      content = <OpportunityResultCards records={records as Record<string, unknown>[]} compact={compact} />;
+      break;
+    case 'people':
+      content = <PersonResultCards records={records as Record<string, unknown>[]} compact={compact} />;
       break;
     case 'tasks':
       content = <TaskResultTable records={records as Record<string, unknown>[]} compact={compact} />;
@@ -458,9 +492,11 @@ export function ToolResultView({ toolName, result, compact }: ToolResultViewProp
       content = <CostTrendView data={dataObj} compact={compact} />;
       break;
     default:
-      content = compact
-        ? <span className="tool-result-summary">{typeof parsed === 'string' ? parsed.slice(0, 120) : JSON.stringify(parsed).slice(0, 120)}</span>
-        : <RawJsonView data={parsed} />;
+      content = hasPersonLikeRecords
+        ? <PersonResultCards records={records as Record<string, unknown>[]} compact={compact} />
+        : compact
+          ? <span className="tool-result-summary">{typeof parsed === 'string' ? parsed.slice(0, 120) : JSON.stringify(parsed).slice(0, 120)}</span>
+          : <RawJsonView data={parsed} />;
   }
 
   return (

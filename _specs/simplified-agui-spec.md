@@ -8,7 +8,7 @@
 │                                                   [Run az login] [Settings]│
 ├────────────────────────────────────────────────────────────────────────────┤
 │                                                                            │
-│                             Conversation Stream                            │
+│                             MCAPS Copilot Tools                            │
 │         (assistant output + AG-UI cards rendered inline as results)       │
 │                                                                            │
 │                     ┌───────────────────────────────────┐                  │

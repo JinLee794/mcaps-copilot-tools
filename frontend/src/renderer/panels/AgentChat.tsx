@@ -1,6 +1,6 @@
 // Agent Chat — unified message timeline with inline tool calls + HITL approval (§5.3)
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { MessageSquare, Bot, SendHorizonal, Wrench, Loader2, CheckCircle2, XCircle, ChevronDown, ChevronRight, Plus, History, X } from 'lucide-react';
+import { MessageSquare, Bot, SendHorizonal, Wrench, Loader2, CheckCircle2, XCircle, ChevronDown, ChevronRight, Plus, History, X, PanelRightOpen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ApprovalCard } from '../components/ApprovalCard';
 import { CliActivityStream } from '../components/CliActivityStream';
@@ -22,9 +22,65 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+interface ObsidianNotePreview {
+  id: string;
+  title: string;
+  markdown: string;
+}
+
 type TimelineItem =
   | { kind: 'message'; data: ChatMessage }
   | { kind: 'tool-call'; data: ToolCallEntry };
+
+const OBSIDIAN_TOOLS = new Set(['read_note', 'read_multiple_notes']);
+
+function parseMcpResult(result: unknown): unknown {
+  if (!result) return null;
+  if (typeof result === 'object' && !Array.isArray(result)) {
+    const obj = result as Record<string, unknown>;
+    if (Array.isArray(obj['content'])) {
+      const first = (obj['content'] as Array<Record<string, unknown>>)[0];
+      if (first?.type === 'text' && typeof first.text === 'string') {
+        try { return JSON.parse(first.text as string); } catch { return first.text; }
+      }
+    }
+    return obj;
+  }
+  if (typeof result === 'string') {
+    try { return JSON.parse(result); } catch { return result; }
+  }
+  return result;
+}
+
+function inferNoteTitle(path: unknown, fallback: string): string {
+  if (typeof path !== 'string' || path.length === 0) return fallback;
+  const base = path.split('/').pop() ?? fallback;
+  return base.replace(/\.md$/i, '');
+}
+
+function extractObsidianNotes(call: ToolCallEntry): ObsidianNotePreview[] {
+  if (!OBSIDIAN_TOOLS.has(call.name) || call.status !== 'success' || call.result == null) return [];
+  const parsed = parseMcpResult(call.result);
+  const argsPath = call.args?.path;
+  if (typeof parsed === 'string') {
+    return [{ id: `${call.id}-single`, title: inferNoteTitle(argsPath, 'Obsidian note'), markdown: parsed }];
+  }
+  if (typeof parsed !== 'object' || parsed == null) return [];
+  const obj = parsed as Record<string, unknown>;
+  if (typeof obj['content'] === 'string') {
+    return [{ id: `${call.id}-single`, title: inferNoteTitle(obj['path'] ?? argsPath, 'Obsidian note'), markdown: String(obj['content']) }];
+  }
+  if (Array.isArray(obj['notes'])) {
+    return (obj['notes'] as Array<Record<string, unknown>>)
+      .filter((n) => typeof n['content'] === 'string')
+      .map((n, i) => ({
+        id: `${call.id}-${i}`,
+        title: inferNoteTitle(n['path'], `Note ${i + 1}`),
+        markdown: String(n['content']),
+      }));
+  }
+  return [];
+}
 
 export function AgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -33,6 +89,7 @@ export function AgentChat() {
   const [sessionList, setSessionList] = useState<SessionMeta[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeSessionTitle, setActiveSessionTitle] = useState<string | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { state } = useAgentState();
   const { toolCalls, interrupt, streamingText, cliActivity } = useAgUiEvents();
@@ -76,6 +133,16 @@ export function AgentChat() {
   }, [messages, toolCalls]);
 
   const isStreaming = state.status === 'running' && streamingText.length > 0;
+  const notePreviews = useMemo(() => {
+    const notes = toolCalls.flatMap(extractObsidianNotes);
+    const dedup = new Map<string, ObsidianNotePreview>();
+    for (const note of notes) {
+      const key = `${note.title}:${note.markdown.slice(0, 80)}`;
+      if (!dedup.has(key)) dedup.set(key, note);
+    }
+    return [...dedup.values()];
+  }, [toolCalls]);
+  const selectedNote = notePreviews.find((n) => n.id === selectedNoteId) ?? null;
 
   // Auto-scroll to bottom on new content
   useEffect(() => {
@@ -134,6 +201,7 @@ export function AgentChat() {
     if (window.electronAPI) {
       await window.electronAPI.sessions.newSession();
       setMessages([]);
+      setSelectedNoteId(null);
       setActiveSessionId(null);
       setActiveSessionTitle(null);
     }
@@ -164,39 +232,16 @@ export function AgentChat() {
 
   return (
     <>
-      <div className="panel-header">
-        <span>
-          Agent Chat
-          {activeSessionTitle && (
-            <span className="session-badge" title={`Session: ${activeSessionId}`}>
-              {activeSessionTitle.length > 40 ? activeSessionTitle.slice(0, 40) + '…' : activeSessionTitle}
-            </span>
-          )}
-        </span>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button
-            className="btn-secondary"
-            style={{ width: 'auto', padding: '2px 8px', marginTop: 0 }}
-            onClick={handleToggleSessionDrawer}
-            title="Session history"
-          >
-            <History size={14} />
-          </button>
-          <button
-            className="btn-secondary"
-            style={{ width: 'auto', padding: '2px 8px', marginTop: 0 }}
-            onClick={handleNewSession}
-            title="New session"
-          >
-            <Plus size={14} />
-          </button>
-          <button
-            className="btn-secondary"
-            style={{ width: 'auto', padding: '2px 8px', marginTop: 0 }}
-            onClick={() => setMessages([])}
-          >
-            Clear
-          </button>
+      <div className="chat-top-actions">
+        {activeSessionTitle && (
+          <span className="session-badge" title={`Session: ${activeSessionId}`}>
+            {activeSessionTitle.length > 40 ? activeSessionTitle.slice(0, 40) + '…' : activeSessionTitle}
+          </span>
+        )}
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn-secondary" style={{ width: 'auto', padding: '4px 9px', marginTop: 0 }} onClick={handleToggleSessionDrawer} title="Session history"><History size={14} /></button>
+          <button className="btn-secondary" style={{ width: 'auto', padding: '4px 9px', marginTop: 0 }} onClick={handleNewSession} title="New session"><Plus size={14} /></button>
+          <button className="btn-secondary" style={{ width: 'auto', padding: '4px 9px', marginTop: 0 }} onClick={() => setMessages([])}>Clear</button>
         </div>
       </div>
 
@@ -231,79 +276,114 @@ export function AgentChat() {
         </div>
       )}
 
-      {/* Chronological timeline */}
-      <div className="chat-messages">
-        {timeline.length === 0 && !interrupt && (
-          <div className="empty-state">
-            <MessageSquare size={32} className="empty-state-icon" />
-            <div className="empty-state-text">What would you like to do?</div>
-          </div>
-        )}
-
-        {timeline.map((item) => {
-          if (item.kind === 'message') {
-            const msg = item.data;
-            const isLastAssistant =
-              msg.role === 'assistant' &&
-              msg.id === messages[messages.length - 1]?.id;
-            return (
-              <div key={msg.id} className={`chat-message ${msg.role}`}>
-                <div className="chat-message-header">
-                  {msg.role === 'user' ? (
-                    'You'
-                  ) : (
-                    <><Bot size={14} className="inline-icon" /> Copilot</>
-                  )}{' '}
-                  — {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
-                <div className="chat-message-body">
-                  {msg.role === 'assistant' ? (
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
-                  ) : (
-                    msg.content
-                  )}
-                  {isLastAssistant && isStreaming && <span className="streaming-cursor" />}
-                </div>
+      <div className={`chat-layout ${selectedNote ? 'note-open' : ''}`}>
+        <div className="chat-main">
+          {/* Chronological timeline */}
+          <div className="chat-messages chat-messages-centered">
+            {timeline.length === 0 && !interrupt && (
+              <div className="empty-state prompt-first-empty">
+                <MessageSquare size={32} className="empty-state-icon" />
+                <div className="empty-state-text">Ask Copilot CLI anything</div>
               </div>
-            );
-          }
-          return <InlineToolCall key={item.data.id} call={item.data} />;
-        })}
+            )}
 
-        {/* HITL Approval Card */}
-        {interrupt && (
-          <ApprovalCard
-            message={interrupt.message}
-            toolName={interrupt.toolName}
-            proposedArgs={interrupt.proposedArgs}
-            diffPreview={interrupt.diffPreview}
-            onApprove={handleApprove}
-            onSkip={handleSkip}
-          />
-        )}
+            {timeline.map((item) => {
+              if (item.kind === 'message') {
+                const msg = item.data;
+                const isLastAssistant =
+                  msg.role === 'assistant' &&
+                  msg.id === messages[messages.length - 1]?.id;
+                return (
+                  <div key={msg.id} className={`chat-message ${msg.role}`}>
+                    <div className="chat-message-header">
+                      {msg.role === 'user' ? (
+                        'You'
+                      ) : (
+                        <><Bot size={14} className="inline-icon" /> Copilot</>
+                      )}{' '}
+                      — {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    <div className="chat-message-body">
+                      {msg.role === 'assistant' ? (
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      ) : (
+                        msg.content
+                      )}
+                      {isLastAssistant && isStreaming && <span className="streaming-cursor" />}
+                    </div>
+                  </div>
+                );
+              }
+              return <InlineToolCall key={item.data.id} call={item.data} />;
+            })}
 
-        {/* CLI Activity (non-tool events only) */}
-        {filteredCliActivity.length > 0 && (
-          <CliActivityStream entries={filteredCliActivity} />
-        )}
+            {/* HITL Approval Card */}
+            {interrupt && (
+              <ApprovalCard
+                message={interrupt.message}
+                toolName={interrupt.toolName}
+                proposedArgs={interrupt.proposedArgs}
+                diffPreview={interrupt.diffPreview}
+                onApprove={handleApprove}
+                onSkip={handleSkip}
+              />
+            )}
 
-        <div ref={messagesEndRef} />
-      </div>
+            {/* CLI Activity (non-tool events only) */}
+            {filteredCliActivity.length > 0 && (
+              <CliActivityStream entries={filteredCliActivity} />
+            )}
 
-      {/* Input */}
-      <div className="chat-input-area">
-        <div className="chat-input-wrapper">
-          <input
-            className="chat-input"
-            placeholder="Ask a follow-up or give instructions..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-          <button className="chat-send-btn" onClick={handleSend}>
-            <SendHorizonal size={16} />
-          </button>
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="chat-input-area centered-input-area">
+            <div className="chat-input-wrapper centered-chat-input-wrapper">
+              <input
+                className="chat-input centered-chat-input"
+                placeholder="Ask Copilot CLI anything..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+              <button className="chat-send-btn" onClick={handleSend}>
+                <SendHorizonal size={16} />
+              </button>
+            </div>
+          </div>
+
+          {notePreviews.length > 0 && (
+            <div className="obsidian-note-strip">
+              <div className="obsidian-note-strip-title"><PanelRightOpen size={13} /> Obsidian Notes</div>
+              <div className="obsidian-note-titles">
+                {notePreviews.map((note) => (
+                  <button
+                    key={note.id}
+                    className={`obsidian-note-pill ${selectedNoteId === note.id ? 'active' : ''}`}
+                    onClick={() => setSelectedNoteId(selectedNoteId === note.id ? null : note.id)}
+                  >
+                    {note.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
+
+        {selectedNote && (
+          <aside className="obsidian-note-panel">
+            <div className="obsidian-note-panel-header">
+              <span>{selectedNote.title}</span>
+              <button className="btn-icon" onClick={() => setSelectedNoteId(null)}>
+                <X size={14} />
+              </button>
+            </div>
+            <div className="obsidian-note-panel-body">
+              <ReactMarkdown>{selectedNote.markdown}</ReactMarkdown>
+            </div>
+          </aside>
+        )}
       </div>
     </>
   );
