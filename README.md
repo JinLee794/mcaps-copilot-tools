@@ -17,6 +17,8 @@ MCAPS Copilot Tools connects GitHub Copilot (in VS Code) to your MSX CRM and Mic
 ## Quick Start (5 Minutes)
 
 > **Prerequisites:**
+> - **Connected to the Microsoft corporate VPN** (required to reach internal CRM endpoints)
+> - A **Microsoft corp account** (used for `az login` authentication)
 > - A GitHub Copilot-compatible IDE such as [VS Code](https://code.visualstudio.com/) (or [VS Code Insiders](https://code.visualstudio.com/insiders/)) with the [GitHub Copilot extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat), **or** the [GitHub Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli/installing-github-copilot-in-the-cli)
 > - [Node.js 18+](https://nodejs.org/)
 > - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)
@@ -31,11 +33,13 @@ npm install
 
 ### Step 2: Sign in to Azure
 
-The MSX CRM tools authenticate through Azure CLI. Sign in with your Microsoft corp account:
+The MSX CRM tools authenticate through Azure CLI. Make sure you are **connected to the Microsoft VPN** and sign in with your **Microsoft corp account**:
 
 ```bash
 az login
 ```
+
+> **Important:** You must be on the corporate VPN and use a Microsoft account (e.g., `your-alias@microsoft.com`). Personal or third-party accounts will not have access to MSX CRM.
 
 ### Step 3: Open the repo in VS Code
 
@@ -129,7 +133,7 @@ If you use [Obsidian](https://obsidian.md/) as a local knowledge base, you can c
    - Alternatively, set the `OBSIDIAN_VAULT_PATH` environment variable and it will use that as the default.
 5. Click **Start** on `mcp-obsidian` in VS Code just like the other servers.
 
-> **Don't use Obsidian?** No worries — everything works without it. The system falls back to `.agent-memory/` for local context storage automatically.
+> **Don't use Obsidian?** No worries — everything works without it. The system operates statelessly (CRM-only) and you can bring your own persistence layer if desired.
 
 ---
 
@@ -213,13 +217,13 @@ You (Copilot Chat)
 
 ### Authentication
 
-All CRM operations authenticate through Azure CLI:
+All CRM operations authenticate through Azure CLI. You must be **connected to the Microsoft corporate VPN** and use your **Microsoft corp account**:
 
 ```bash
 az login
 ```
 
-Make sure you're signed in with your Microsoft corp account before starting the MCP servers.
+Make sure you're on VPN and signed in with your Microsoft corp account (e.g., `your-alias@microsoft.com`) before starting the MCP servers.
 
 ### MCP Server Config
 

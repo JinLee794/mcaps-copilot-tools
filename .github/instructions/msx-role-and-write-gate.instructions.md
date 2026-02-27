@@ -11,11 +11,12 @@ applyTo: "mcp-server/**"
 
 ## 0) CRM Read Scoping (Required before bulk reads)
 Before calling any CRM read tool that may return large result sets (especially `get_milestones` with `mine: true`):
-1. **Confirm the user's role** (see §1 below).
-2. **Ask at least one scoping question**: which opportunity/customer, which status, what time range, or what specific data is needed.
-3. **Prefer `crm_query`** with `$filter`, `$select`, `$top` for targeted lookups over bulk `get_milestones(mine: true)`.
-4. **Use `get_milestones` with a specific `opportunityId` or `milestoneId`/`milestoneNumber`** when you have the identifier.
-5. Only use `get_milestones(mine: true)` (unfiltered) if the user explicitly requests all milestones and you have warned about volume.
+1. **VAULT-PREFETCH first**: If `mcp-obsidian` is available, read `Customers/<Name>.md` for the target customer to extract known opportunity GUIDs, account IDs, and team context. Use these IDs directly in CRM queries — do not run CRM discovery queries for identifiers the vault already has. (See `obsidian-vault.instructions.md` § VAULT-PREFETCH.)
+2. **Confirm the user's role** (see §1 below).
+3. **Ask scoping questions only if the vault didn't resolve scope**: which opportunity/customer, which status, what time range, or what specific data is needed.
+4. **Prefer `crm_query`** with `$filter`, `$select`, `$top` for targeted lookups over bulk `get_milestones(mine: true)`.
+5. **Use `get_milestones` with a specific `opportunityId` or `milestoneId`/`milestoneNumber`** when you have the identifier (from vault or user).
+6. Only use `get_milestones(mine: true)` (unfiltered) if the user explicitly requests all milestones and you have warned about volume.
 
 ## 1) Role Resolution (Required before workflow guidance)
 1. Identify current user via `crm_auth_status` (or `crm_whoami`).

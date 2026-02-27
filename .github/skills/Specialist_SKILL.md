@@ -184,6 +184,7 @@ If SE is accountable for technical win and CSA/CSAM are accountable for executio
 
 #### Upfront Scoping Pattern (minimize context expansion)
 Collect relevant scope in as few calls as possible before branching into per-milestone workflows:
+0. **VAULT-PREFETCH** — read vault customer roster and context to scope CRM queries. Skipped automatically if `mcp-obsidian` is unavailable (see `obsidian-vault.instructions.md` § Vault Protocol Phases).
 1. `get_my_active_opportunities()` — one call returns all active opps with customer names (use `customerKeyword` to narrow).
 2. `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — compact grouped output instead of full records.
 3. Only call `get_milestone_activities(milestoneId)` for specific milestones needing investigation.
@@ -261,10 +262,11 @@ Collect relevant scope in as few calls as possible before branching into per-mil
 **Trigger**: Net-new opportunity signal is scattered across meetings/chats/docs instead of CRM fields.
 
 **Flow**:
-1. Build scoped query (customer, timeframe, people, source types, topic keywords).
+1. Build scoped query (customer, **explicit date range**, people, source types, topic keywords).
 2. Call WorkIQ MCP (`ask_work_iq`) to retrieve relevant Teams/meeting/Outlook/SharePoint evidence.
-3. Call `get_my_active_opportunities()` and `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` for current CRM state.
-4. Produce Specialist routing guidance and dry-run action proposals where evidence suggests missing/stale CRM structure.
+3. **VAULT-CORRELATE** — cross-reference WorkIQ results with vault notes for the same date window. Surface prior meeting notes, stakeholder context, and qualification signals. Strict date boundaries.
+4. Call `get_my_active_opportunities()` and `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` for current CRM state.
+5. Produce Specialist routing guidance and dry-run action proposals where evidence suggests missing/stale CRM structure.
 
 **Output schema**:
 - `signal_summary`

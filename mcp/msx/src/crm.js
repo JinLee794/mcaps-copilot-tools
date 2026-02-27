@@ -145,6 +145,11 @@ export function createCrmClient(authService) {
 
       return { ok: true, status: response.status, data };
     } catch (err) {
+      // On 401, clear the cached token and retry once with a fresh token
+      if (err.status === 401 && !opts._authRetried) {
+        authService.clearToken();
+        return request(entityPath, { ...opts, _authRetried: true });
+      }
       return {
         ok: false,
         status: err.status || 500,
@@ -172,6 +177,20 @@ export function createCrmClient(authService) {
         const resp = await fetch(nextLink, {
           headers: getHeaders(token)
         });
+        if (resp.status === 401) {
+          // Clear stale token and retry this page once
+          authService.clearToken();
+          const retryAuth = await authService.ensureAuth();
+          if (!retryAuth.success) break;
+          const retryResp = await fetch(nextLink, {
+            headers: getHeaders(authService.getToken())
+          });
+          if (!retryResp.ok) break;
+          const retryPage = await retryResp.json();
+          if (retryPage?.value) allValues.push(...retryPage.value);
+          nextLink = retryPage['@odata.nextLink'];
+          continue;
+        }
         if (!resp.ok) break;
         const page = await resp.json();
         if (page?.value) allValues.push(...page.value);

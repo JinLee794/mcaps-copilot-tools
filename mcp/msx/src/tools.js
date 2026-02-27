@@ -333,7 +333,7 @@ export function registerTools(server, crmClient) {
   // ── get_my_active_opportunities ─────────────────────────────
   server.tool(
     'get_my_active_opportunities',
-    'Returns active opportunities where you are the owner or on the deal team (via milestone ownership). Optionally filter by customer name.',
+    'Returns active opportunities where you are the owner or have milestone ownership (used as a heuristic for deal-team involvement — note: this does NOT query the actual opportunity-level deal team, which is not retrievable via OData). Optionally filter by customer name.',
     {
       customerKeyword: z.string().optional().describe('Case-insensitive customer name filter')
     },

@@ -160,6 +160,7 @@ When this model is explicit, CSAM friction is treated as upstream ambiguity to c
 
 #### Upfront Scoping Pattern (minimize context expansion)
 Collect relevant scope in as few calls as possible before branching into per-milestone workflows:
+0. **VAULT-PREFETCH** — read vault customer roster and context to scope CRM queries. Skipped automatically if `mcp-obsidian` is unavailable (see `obsidian-vault.instructions.md` § Vault Protocol Phases).
 1. `get_my_active_opportunities()` — one call returns all active opps with customer names (use `customerKeyword` to narrow).
 2. `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — compact grouped output instead of full records.
 3. Only call `get_milestone_activities(milestoneId)` for specific milestones needing investigation.
@@ -311,10 +312,11 @@ Collect relevant scope in as few calls as possible before branching into per-mil
 **Trigger**: CSAM needs customer-facing evidence for risk, adoption, or value realization updates.
 
 **Flow**:
-1. Build scoped request (customer/opportunity, stakeholders, timeframe, source types).
+1. Build scoped request (customer/opportunity, stakeholders, **explicit date range**, source types).
 2. Call WorkIQ MCP (`ask_work_iq`) to retrieve Teams/meeting/Outlook/SharePoint evidence.
-3. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` and `get_milestone_activities(milestoneId)` for execution state (targeted milestones only).
-4. Produce a consolidated CSAM-ready pack and dry-run follow-up actions (`create_task(...)`, `update_milestone(...)`) where needed.
+3. **VAULT-CORRELATE** — cross-reference WorkIQ results with vault notes for the same date window. Surface prior customer communication history, decisions, and action owners. Strict date boundaries.
+4. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` and `get_milestone_activities(milestoneId)` for execution state (targeted milestones only).
+5. Produce a consolidated CSAM-ready pack and dry-run follow-up actions (`create_task(...)`, `update_milestone(...)`) where needed.
 
 **Decision logic**:
 - Raise `communication_gap` if CRM risk/status has no recent corroborating customer evidence.
