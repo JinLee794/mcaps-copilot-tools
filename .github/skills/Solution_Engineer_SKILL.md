@@ -105,7 +105,8 @@ Drive technical win quality through disciplined milestone-task management and ti
 
 ## Operating Procedure
 1. Resolve role and scope (`crm_auth_status` + selected role workflow).
-2. Discover active opportunities: `get_my_active_opportunities()` (or `get_my_active_opportunities({ customerKeyword })` to narrow).
+2. **Run VAULT-PREFETCH** (see `obsidian-vault.instructions.md`) — scope CRM queries using vault customer roster and context. Skipped automatically if `mcp-obsidian` is unavailable.
+3. Discover active opportunities: `get_my_active_opportunities()` (or `get_my_active_opportunities({ customerKeyword })` to narrow).
 3. Pull scoped milestone summaries: `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` per opportunity.
 4. Pull activities only for milestones with unclear progression (`get_milestone_activities(milestoneId)`).
 5. Perform task hygiene checks for flagged milestones.
@@ -114,6 +115,7 @@ Drive technical win quality through disciplined milestone-task management and ti
    - committed + SE-influenced => task updates continue.
 7. Build dry-run write plan (`create_task`, `update_task`, `close_task`, optional `update_milestone`).
 8. Produce confirmation packet before any write-intent execution.
+9. **Run VAULT-PROMOTE** — persist validated findings to the vault after workflow completion.
 
 ## Guardrails (Pass/Fail)
 ### 1) Task Completeness
@@ -168,7 +170,8 @@ Trigger: weekly cadence or pre-review hygiene pass.
 
 Steps:
 1. `crm_auth_status`
-2. `get_my_active_opportunities()` — replaces `list_accounts_by_tpid` + `list_opportunities`; returns compact list in one call.
+2. **VAULT-PREFETCH** — read vault customer roster and context to scope the hygiene pass. If vault is unavailable, proceed with CRM-only scoping.
+3. `get_my_active_opportunities()` — replaces `list_accounts_by_tpid` + `list_opportunities`; returns compact list in one call.
 3. `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — compact grouped output per opportunity; skip completed/closed milestones.
 4. `get_milestone_activities(milestoneId)` — only for milestones flagged as stale, at-risk, or missing tasks.
 5. `crm_query(...)` only when extra technical fields are required.
@@ -230,16 +233,38 @@ Output schema:
 Trigger: CRM status is unclear and corroboration is needed from collaboration artifacts.
 
 Steps:
-1. Build scope (customer, opportunity, people, date range, source types).
+1. Build scope (customer, opportunity, people, **explicit date range — always bound to today or a stated window**).
 2. Call WorkIQ MCP (`ask_work_iq`) for Teams/meetings/Outlook/SharePoint evidence.
-3. Compare evidence with `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` and `get_milestone_activities(milestoneId)` (targeted only).
-4. Produce a concise `evidence_vs_crm` summary and dry-run remediation proposals if gaps exist.
+3. **VAULT-CORRELATE** — cross-reference WorkIQ results with vault notes for the same date window. Surface prior meeting notes, decisions, and action items that relate to retrieved evidence. Maintain strict date boundaries.
+4. Compare evidence with `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` and `get_milestone_activities(milestoneId)` (targeted only).
+5. Produce a concise `evidence_vs_crm` summary and dry-run remediation proposals if gaps exist.
 
 Output schema:
 - `fact_map`
 - `m365_evidence_summary`
+- `vault_correlation` (matched vault notes and connections, if vault available)
 - `crm_alignment_findings`
 - `suggested_updates` (dry-run)
+
+### Flow E: Vault-Correlated Activity Mapping
+Trigger: User asks "what should I update based on today's activities" or similar activity-to-milestone mapping request.
+
+Steps:
+1. `crm_auth_status`
+2. **VAULT-PREFETCH** — read vault customer roster to identify which customers to query M365 for.
+3. `get_my_active_opportunities()` — get active opps, filtered by vault roster when available.
+4. Call WorkIQ MCP (`ask_work_iq`) scoped to **today only** (explicit date boundaries) for each vault-listed customer with active opps.
+5. **VAULT-CORRELATE** — search vault for today's meeting notes, prior decisions, and action items matching retrieved activities. Strict same-day boundary.
+6. `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` for opps with matched activities.
+7. Map activities → milestones: identify which milestones should be updated or created based on today's evidence + vault context.
+8. Produce dry-run recommendations (create milestone, update forecast comments, create/update tasks).
+9. **VAULT-PROMOTE** — persist validated activity-to-milestone mappings to vault customer files.
+
+Output schema:
+- `activity_map` (today's activities grouped by customer)
+- `vault_context` (related vault notes surfaced by VAULT-CORRELATE)
+- `milestone_recommendations` (create/update actions with rationale)
+- `dry_run_operations` (preview payloads)
 
 ## Decision Branches
 - If milestone is uncommitted and BANT is incomplete: do not hand off; update BANT-closing tasks.

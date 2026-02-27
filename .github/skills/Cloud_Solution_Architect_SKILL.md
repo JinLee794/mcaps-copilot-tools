@@ -140,6 +140,7 @@ Own the **customer technical success path** and ensure committed opportunities a
 
 #### Upfront Scoping Pattern (minimize context expansion)
 Collect relevant scope in as few calls as possible before branching into per-milestone workflows:
+0. **VAULT-PREFETCH** — read vault customer roster and context to scope CRM queries. Skipped automatically if `mcp-obsidian` is unavailable (see `obsidian-vault.instructions.md` § Vault Protocol Phases).
 1. `get_my_active_opportunities()` — one call returns all active opps with customer names (use `customerKeyword` to narrow).
 2. `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — compact grouped output instead of full records.
 3. Only call `get_milestone_activities(milestoneId)` for specific milestones needing investigation.
@@ -289,13 +290,15 @@ Collect relevant scope in as few calls as possible before branching into per-mil
 **Trigger**: CSA needs proof of execution context beyond CRM comments/activities.
 
 **Flow**:
-1. Build scoped query (customer/opportunity, people, timeframe, source types).
+1. Build scoped query (customer/opportunity, people, **explicit date range**, source types).
 2. Call WorkIQ MCP (`ask_work_iq`) to retrieve relevant Teams/meeting/Outlook/SharePoint evidence.
-3. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` and `get_milestone_activities(milestoneId)` (targeted only).
-4. Compare M365 evidence with CRM status and draft dry-run gap closures via `update_milestone(...)` and `create_task(...)`.
+3. **VAULT-CORRELATE** — cross-reference WorkIQ results with vault notes for the same date window. Surface prior meeting notes, architecture decisions, and dependency context. Strict date boundaries.
+4. Call `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` and `get_milestone_activities(milestoneId)` (targeted only).
+5. Compare M365 evidence + vault context with CRM status and draft dry-run gap closures via `update_milestone(...)` and `create_task(...)`.
 
 **Output schema**:
 - `m365_evidence_map`
+- `vault_correlation` (matched vault notes and connections, if vault available)
 - `execution_integrity_findings`
 - `dry_run_corrections`
 - `reroute_action_set`

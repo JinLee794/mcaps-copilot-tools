@@ -1,5 +1,5 @@
 # MCAPS Copilot Tools
-
+![alt text](./docs/assets/banner.png)
 > **Your AI-powered sales operations toolkit for MCAPS.**
 > Talk to Copilot in plain English to manage MSX opportunities, milestones, and tasks — no coding required.
 
@@ -17,12 +17,13 @@ MCAPS Copilot Tools connects GitHub Copilot (in VS Code) to your MSX CRM and Mic
 ## Quick Start (5 Minutes)
 
 > **Prerequisites:**
+> - **Connected to the Microsoft corporate VPN** (required to reach internal CRM endpoints)
+> - A **Microsoft corp account** (used for `az login` authentication)
 > - A GitHub Copilot-compatible IDE such as [VS Code](https://code.visualstudio.com/) (or [VS Code Insiders](https://code.visualstudio.com/insiders/)) with the [GitHub Copilot extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat), **or** the [GitHub Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli/installing-github-copilot-in-the-cli)
 > - [Node.js 18+](https://nodejs.org/)
 > - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)
 
 ### Step 1: Clone and install
-
 ```bash
 git clone https://github.com/JinLee794/mcaps-copilot-tools.git
 cd mcaps-copilot-tools/mcp/msx
@@ -31,11 +32,13 @@ npm install
 
 ### Step 2: Sign in to Azure
 
-The MSX CRM tools authenticate through Azure CLI. Sign in with your Microsoft corp account:
+The MSX CRM tools authenticate through Azure CLI. Make sure you are **connected to the Microsoft VPN** and sign in with your **Microsoft corp account**:
 
 ```bash
 az login
 ```
+
+> **Important:** You must be on the corporate VPN and use a Microsoft account (e.g., `your-alias@microsoft.com`). Personal or third-party accounts will not have access to MSX CRM.
 
 ### Step 3: Open the repo in VS Code
 
@@ -79,13 +82,15 @@ Copy-paste any of these into the Copilot chat window after you've started the MC
 
 ### Writing CRM data (with confirmation)
 
+> **⚠️ Write operations are disabled by default.** The tools below (create, update, close) are included in the codebase but should be considered **experimental**. They use a staged approval flow — changes are previewed before anything touches CRM — but CRM is production data shared across your account team. **Enable write operations at your own risk.** Always review staged changes carefully before approving, and use AI responsibly. See [Write Operations & Responsible AI Use](#write-operations--responsible-ai-use) for details.
+
 | What you want | Prompt to try |
 |---|---|
 | Create a task | `Create a task under the "Cloud Assessment" milestone for Contoso: "Schedule architecture review with customer" due next Friday.` |
 | Close a task | `Close the "Schedule architecture review" task for Contoso — it's done.` |
 | Update a milestone | `Update the Cloud Assessment milestone status to "On Track".` |
 
-> **Note:** All write operations will ask you to confirm before anything is changed. You always get a chance to review and approve.
+> **Note:** All write operations use a **Stage → Review → Execute** flow. Nothing is written to CRM until you explicitly approve.
 
 ### Searching M365 evidence (WorkIQ)
 
@@ -129,7 +134,7 @@ If you use [Obsidian](https://obsidian.md/) as a local knowledge base, you can c
    - Alternatively, set the `OBSIDIAN_VAULT_PATH` environment variable and it will use that as the default.
 5. Click **Start** on `mcp-obsidian` in VS Code just like the other servers.
 
-> **Don't use Obsidian?** No worries — everything works without it. The system falls back to `.agent-memory/` for local context storage automatically.
+> **Don't use Obsidian?** No worries — everything works without it. The system operates statelessly (CRM-only) and you can bring your own persistence layer if desired.
 
 ---
 
@@ -155,17 +160,19 @@ These tools let Copilot interact with MSX CRM on your behalf:
 
 | Tool | What it does |
 |---|---|
+| Tool | What it does |
+|---|---|
 | `crm_whoami` | Checks who you are in MSX (validates authentication) |
 | `crm_query` | Runs read-only OData queries against CRM |
 | `crm_get_record` | Fetches a specific CRM record by ID |
 | `list_opportunities` | Lists opportunities, filterable by customer |
 | `get_milestones` | Lists milestones for an opportunity or owner |
 | `find_milestones_needing_tasks` | Finds milestones across customers that need task attention |
-| `create_task` | Creates a new task under a milestone |
-| `update_task` / `close_task` | Updates or closes an existing task |
-| `update_milestone` | Updates milestone status or details |
 | `view_milestone_timeline` | Returns a timeline view of milestones |
 | `view_opportunity_cost_trend` | Returns cost trend data for an opportunity |
+| `create_task` | ⚠️ Creates a new task under a milestone *(write — staged)* |
+| `update_task` / `close_task` | ⚠️ Updates or closes an existing task *(write — staged)* |
+| `update_milestone` | ⚠️ Updates milestone status or details *(write — staged)* |
 
 ### Role Skills
 
@@ -191,6 +198,34 @@ Learn more: [WorkIQ overview (Microsoft Learn)](https://learn.microsoft.com/en-u
 
 ---
 
+## Write Operations & Responsible AI Use
+
+> **CRM is shared production data.** Incorrect writes can affect your entire account team and customer-facing records. Use AI-assisted write operations responsibly.
+
+### Current status: writes are experimental
+
+The write tools (`create_task`, `update_task`, `close_task`, `update_milestone`) are included in the MCP server but should be treated as **experimental**. They are designed with safety guardrails, but you should understand the risks before relying on them.
+
+### How write safety works
+
+All write operations use a **Stage → Review → Execute** pattern (see [STAGED_OPERATIONS.md](mcp/msx/STAGED_OPERATIONS.md) for technical details):
+
+1. **Stage** — When you ask Copilot to create/update/close a record, the change is validated and staged locally. **Nothing is written to CRM yet.**
+2. **Review** — Copilot shows you a before/after diff of the proposed change and asks for your approval.
+3. **Execute** — Only after you explicitly approve does the change get sent to CRM. You can cancel at any time.
+
+Staged operations expire automatically after 10 minutes if not acted on.
+
+### Responsible AI guidelines
+
+- **Always review before approving.** Read the staged diff carefully. Verify field values, dates, and record IDs.
+- **Don't batch-approve blindly.** If Copilot stages multiple operations, review each one. Use `cancel_operation` to discard any you're unsure about.
+- **Verify the right record.** CRM GUIDs can look similar. Confirm the opportunity/milestone name matches what you expect.
+- **Start with reads.** Before writing, use read tools (`crm_query`, `get_milestones`) to confirm the current state of the record.
+- **You are accountable.** AI suggests changes, but you own the approval. Treat every write approval as if you were making the change manually in MSX.
+
+---
+
 ## How It Works (Under the Hood)
 
 ```
@@ -213,13 +248,13 @@ You (Copilot Chat)
 
 ### Authentication
 
-All CRM operations authenticate through Azure CLI:
+All CRM operations authenticate through Azure CLI. You must be **connected to the Microsoft corporate VPN** and use your **Microsoft corp account**:
 
 ```bash
 az login
 ```
 
-Make sure you're signed in with your Microsoft corp account before starting the MCP servers.
+Make sure you're on VPN and signed in with your Microsoft corp account (e.g., `your-alias@microsoft.com`) before starting the MCP servers.
 
 ### MCP Server Config
 
