@@ -30,7 +30,7 @@ flowchart LR
 
 For this repository, orchestration state is intentionally local-first and workspace-bound.
 
-- **Obsidian vault** (`mcp-obsidian`) is the durable knowledge layer — customer context, decisions, agent insights, and Connect hooks are persisted here. See [`.github/instructions/obsidian-vault.instructions.md`](../.github/instructions/obsidian-vault.instructions.md) for the full vault protocol.
+- **Obsidian vault** (via OIL — `oil` MCP server) is the durable knowledge layer — customer context, decisions, agent insights, and Connect hooks are persisted here. See [`.github/instructions/obsidian-vault.instructions.md`](../.github/instructions/obsidian-vault.instructions.md) for the full vault protocol.
 - `.vscode/mcp.json` is the MCP baseline and `.vscode/mcp.runtime.overlay.json` is runtime delta.
 - Copilot CLI session continuity relies on these files, not a remote persistence service.
 
@@ -38,7 +38,7 @@ For this repository, orchestration state is intentionally local-first and worksp
 
 The vault is optional. Without it, the agent operates statelessly (CRM-only). If you want persistent cross-session memory, you can:
 
-1. **Use Obsidian MCP** (recommended) — configure `mcp-obsidian` in `.vscode/mcp.json`. See the [README](../README.md#optional-obsidian-mcp-for-local-knowledge) for setup.
+1. **Use OIL** (recommended) — configure the `oil` MCP server in `.vscode/mcp.json`. See the [README](../README.md#optional-enable-obsidian-vault-integration) for setup. OIL provides 22 domain-specific tools with pre-indexed search, context-aware composites, and gated writes.
 2. **Bring your own MCP server** — any MCP server that provides read/write note operations works. Wire it into `.vscode/mcp.json` and update [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) to tell the agent how to use it.
 3. **Use Copilot instructions** — the agent's behavior is shaped by instruction files. See these examples for how persistence is wired into agent workflows:
    - [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) — Tier 0 always-loaded rules, including the Knowledge Layer section

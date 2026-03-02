@@ -105,7 +105,7 @@ Drive technical win quality through disciplined milestone-task management and ti
 
 ## Operating Procedure
 1. Resolve role and scope (`crm_auth_status` + selected role workflow).
-2. **Run VAULT-PREFETCH** (see `obsidian-vault.instructions.md`) — scope CRM queries using vault customer roster and context. Skipped automatically if `mcp-obsidian` is unavailable.
+2. **Run VAULT-PREFETCH** (see `obsidian-vault.instructions.md`) — scope CRM queries using vault customer roster and context. Skipped automatically if OIL is unavailable.
 3. Discover active opportunities: `get_my_active_opportunities()` (or `get_my_active_opportunities({ customerKeyword })` to narrow).
 3. Pull scoped milestone summaries: `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` per opportunity.
 4. Pull activities only for milestones with unclear progression (`get_milestone_activities(milestoneId)`).

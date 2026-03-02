@@ -16,7 +16,7 @@ When writing Connect hooks:
 Connect hooks follow the vault-first storage pattern defined in `.github/instructions/obsidian-vault.instructions.md`.
 
 **Summary:**
-1. **Vault available**: Append to `Customers/<CustomerName>.md` under `## Connect Hooks` (use `patch_note` with `operation: "append"` and `heading: "Connect Hooks"`). Create the file/section if it doesn't exist.
+1. **Vault available**: Use `capture_connect_hook({ customer: "<CustomerName>", hook: { ... } })` to append to the customer's vault file under `## Connect Hooks`. The tool handles section creation if it doesn't exist.
 2. **Always**: Write to `.connect/hooks/hooks.md` as a repo-tracked backup, regardless of vault availability.
 3. **Vault unavailable**: `.connect/hooks/hooks.md` is the sole destination.
 

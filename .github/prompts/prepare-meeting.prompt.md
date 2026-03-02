@@ -16,11 +16,10 @@ From the meeting title or user input, determine the customer and project.
 
 ### Step 2 — Gather Vault Context
 
-Pull context using mcp-obsidian tools:
-- `read_note` on `Customers/<Name>.md` → account summary, team, opportunities, recent notes.
-- `read_note` on `Projects/<Name>.md` → current status, open items, tech stack.
-- `search_notes({ query: "<customer or project name>" })` in `Meetings/` → last 3-5 related meetings.
-- `read_multiple_notes` on the most recent related meetings → extract action items, decisions, attendees.
+Pull context using OIL tools:
+- `get_customer_context({ customer: "<Name>" })` → assembled account summary, team, opportunities, recent notes, and agent insights.
+- `search_vault({ query: "<project name>", paths: ["Projects/"] })` → current project status, open items, tech stack.
+- `query_notes({ filter: "folder:Meetings tag:customer/<name>", limit: 5, sort: "modified" })` → last 3-5 related meetings with action items, decisions, attendees.
 
 ### Step 3 — M365 Context via WorkIQ
 

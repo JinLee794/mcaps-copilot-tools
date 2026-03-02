@@ -60,12 +60,12 @@ After Pass 1 returns candidate results, resolve the people and entities mentione
 Identify all people mentioned in candidate threads, meetings, transcripts, and emails (attendees, senders, @mentions, participants).
 
 **Step 2 — Resolve via vault People notes.**
-If `mcp-obsidian` is available:
-1. Query `search_notes` with tag `people` (or search `People/` directory).
-2. For each person found, read frontmatter fields: `customers` (list of associated customer accounts), `company`, `org` (`internal`/`customer`/`partner`).
-3. Build a lookup table: `Person Name → [Customer1, Customer2, ...]`.
-4. People with `org: customer` directly indicate customer attribution — their `company` field names the customer.
-5. People with `org: internal` who have `customers` associations indicate which accounts that internal team member covers.
+If OIL is available:
+1. Call `resolve_people_to_customers({ names: ["Person A", "Person B", ...] })` to batch-resolve participant names to customer associations.
+2. The tool returns a lookup table: `Person Name → [Customer1, Customer2, ...]` with `org` classification (`internal`/`customer`/`partner`).
+3. People with `org: customer` directly indicate customer attribution.
+4. People with `org: internal` who have customer associations indicate which accounts that internal team member covers.
+5. For any names not resolved, fall through to Step 3 (CRM resolution).
 
 **Step 3 — Resolve via CRM.**
 For people not found in vault, or to validate/enrich vault associations:
@@ -87,7 +87,7 @@ If a candidate maps to multiple customers with equal confidence, or if key parti
 **Fallback (no vault):** Skip Step 2; rely on CRM resolution (Step 3) and user confirmation for unknown contacts.
 
 ### Vault Correlation (between passes)
-- **VAULT-CORRELATE** — after Pass 1 candidates are identified and entity resolution is complete, cross-reference with vault notes for the same date window if `mcp-obsidian` is available (see `obsidian-vault.instructions.md` § Vault Protocol Phases). Use the resolved customer attributions from Entity Resolution to target vault searches — read `Customers/<ResolvedCustomer>.md` for relevant context, prior decisions, and open items. Surface related meeting notes, decisions, and action items to enrich Pass 2 retrieval. If vault is unavailable, skip and proceed to Pass 2.
+- **VAULT-CORRELATE** — after Pass 1 candidates are identified and entity resolution is complete, cross-reference with vault notes for the same date window if OIL is available (see `obsidian-vault.instructions.md` § Vault Protocol Phases). Use the resolved customer attributions from Entity Resolution to target vault searches — call `get_customer_context({ customer: "<ResolvedCustomer>" })` for relevant context, prior decisions, and open items. Surface related meeting notes, decisions, and action items to enrich Pass 2 retrieval. If vault is unavailable, skip and proceed to Pass 2.
 
 ### Pass 2: Deep Retrieval
 - Retrieve full detail only for candidates matched in Pass 1.

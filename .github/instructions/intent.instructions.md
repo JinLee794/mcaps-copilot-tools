@@ -58,7 +58,7 @@ Account team communication flows through multiple systems. The agent must reason
 |---|---|---|
 | **MSX / CRM** | System of record for pipeline, milestones, tasks, ownership | `msx-crm` tools: structured reads + write-intent planning |
 | **M365 Collaboration** | Real-time context — meetings, chats, emails, shared docs | WorkIQ (`ask_work_iq`): evidence retrieval across Teams, Outlook, SharePoint |
-| **Vault / User Memory** | Persistent account-level knowledge, decisions, patterns | Obsidian vault (`mcp-obsidian`) when configured; otherwise user-supplied persistence or stateless operation |
+| **Vault / User Memory** | Persistent account-level knowledge, decisions, patterns | Obsidian vault (OIL — `oil` MCP server) when configured; otherwise user-supplied persistence or stateless operation |
 | **Governance Cadences** | Weekly/monthly rhythms where decisions land and risks surface | Recipes + synthesis workflows that align to cadence timing |
 | **External Signals** | Customer health, consumption trends, market/competitive shifts | CRM consumption fields, milestone dates, forecast commentary |
 

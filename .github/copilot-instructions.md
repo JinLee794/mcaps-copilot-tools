@@ -19,7 +19,7 @@ At session start (or first account-team request), probe which mediums are querya
 | Medium | Probe | If unavailable |
 |---|---|---|
 | **CRM** | `crm_auth_status` or `crm_whoami` | Inform user; no CRM reads/writes this session |
-| **Vault** | `list_directory("Customers/")` via `mcp-obsidian` | Skip VAULT-PREFETCH; operate stateless; note reduced context |
+| **Vault** | `get_vault_context()` via OIL (`oil` MCP server) | Skip VAULT-PREFETCH; operate stateless; note reduced context |
 | **WorkIQ / M365** | `ask_work_iq` with a minimal scoped query | Skip M365 evidence layer; note communication gap detection is limited |
 
 - Cache probe results for the session — do not re-probe on every request.
@@ -58,17 +58,14 @@ Use this repository as an MCP-first workflow.
 
 **Never call `get_milestones` with `mine: true` (or no filters) as the first action.** This returns _all_ milestones for the user and produces massive payloads (500KB+). Always narrow scope before retrieval.
 
-**Step 0 — VAULT-PREFETCH (mandatory when `mcp-obsidian` is available).** Before asking the user scoping questions or calling any CRM tool, check the Obsidian vault for the customer:
-1. Call `list_directory("Customers/")` to confirm vault availability and list the active customer roster.
-2. If the user named a customer (or you can infer one), call `read_note("Customers/<Name>.md")` to extract:
-   - **Opportunity GUIDs** from the `## Opportunities` section — use these directly in CRM queries (`_msp_opportunityid_value eq '<GUID>'`) instead of running discovery queries.
-   - **Account TPID / Account ID** from frontmatter — use for `crm_query` account filters.
-   - **Team composition** — know who owns what before querying milestones.
-   - **Prior Agent Insights** — avoid redundant queries for information already validated.
-3. If vault has the opportunity GUID(s), **skip Step 1** (no need to ask the user for IDs you already have) and go directly to Step 2/3 with vault-provided IDs.
-4. If vault is unavailable or the customer has no vault file, fall through to Step 1.
+**Step 0 — VAULT-PREFETCH (mandatory when OIL is available).** Before asking the user scoping questions or calling any CRM tool, check the Obsidian vault for the customer:
+1. Call `get_vault_context()` to confirm vault availability and get the vault map (folder tree, note count, top tags, active customers).
+2. If the user named a customer (or you can infer one), call `get_customer_context({ customer: "<Name>" })` — this returns assembled context including opportunities (with GUIDs), team, action items, meetings, and agent insights in one call. Use the returned opportunity GUIDs directly in CRM queries (`_msp_opportunityid_value eq '<GUID>'`).
+3. For CRM-ready OData filters, use `prepare_crm_prefetch({ customers: ["<Name>"] })` — returns pre-built filter strings ready to paste into `crm_query`.
+4. If vault has the opportunity GUID(s), **skip Step 1** (no need to ask the user for IDs you already have) and go directly to Step 2/3 with vault-provided IDs.
+5. If OIL is unavailable or the customer has no vault file, fall through to Step 1.
 
-⚠️ **Do NOT skip this step when `mcp-obsidian` is available.** The vault is the primary source for customer→opportunity ID mapping. Going straight to CRM discovery queries when the vault has the answer wastes API calls and returns oversized payloads.
+⚠️ **Do NOT skip this step when OIL is available.** The vault is the primary source for customer→opportunity ID mapping. Going straight to CRM discovery queries when the vault has the answer wastes API calls and returns oversized payloads.
 
 **Step 1 — Clarify intent (if vault didn't fully resolve scope).** Ask clarifying questions to narrow scope:
 - Which opportunity or customer? (name or ID)
@@ -111,9 +108,10 @@ Use this repository as an MCP-first workflow.
 - ❌ `crm_query` with `msp_forecastedconsumptionrecurring` in select — field does not exist
 - ❌ `crm_query` with `msp_estimatedcompletiondate` in select/filter — field does not exist on milestone; use `msp_milestonedate`
 - ❌ Loop: `list_opportunities` per customer → `get_milestones` per opp → `get_milestone_activities` per milestone (~30 calls)
-- ❌ Skipping vault: user says "check Contoso milestones" → agent calls `list_opportunities({ customerKeyword: "Contoso" })` without first reading `Customers/Contoso.md` from vault
-- ❌ Ignoring vault IDs: vault `Customers/Contoso.md` has opportunity GUID → agent still runs `crm_query` on `accounts` to find the account → then queries `opportunities` to find the GUID
-- ✅ Vault-first: user says "check Contoso milestones" → `read_note("Customers/Contoso.md")` → extract opportunity GUID → `crm_query` with `_msp_opportunityid_value eq '<GUID>'` (2 calls, precise)
+- ❌ Skipping vault: user says "check Contoso milestones" → agent calls `list_opportunities({ customerKeyword: "Contoso" })` without first calling `get_customer_context({ customer: "Contoso" })` from OIL
+- ❌ Ignoring vault IDs: OIL `get_customer_context("Contoso")` returns opportunity GUIDs → agent still runs `crm_query` on `accounts` to find the account → then queries `opportunities` to find the GUID
+- ✅ Vault-first: user says "check Contoso milestones" → `get_customer_context({ customer: "Contoso" })` → use returned opportunity GUID → `crm_query` with `_msp_opportunityid_value eq '<GUID>'` (2 calls, precise)
+- ✅ CRM-ready prefetch: `prepare_crm_prefetch({ customers: ["Contoso"] })` → returns pre-built OData filter strings → paste into `crm_query` (2 calls, zero manual ID extraction)
 - ✅ `find_milestones_needing_tasks({ customerKeywords: ["Contoso", "Fabrikam", "Northwind"] })` (1 call)
 - ✅ `crm_query({ entitySet: "msp_engagementmilestones", filter: "_msp_opportunityid_value eq '...' and msp_milestonestatus eq 861980000", top: 25 })` (filtered, efficient)
 - ✅ `get_milestone_activities({ milestoneIds: ["ms1", "ms2", "ms3"] })` (1 call instead of 3)
@@ -126,20 +124,20 @@ Use this repository as an MCP-first workflow.
 
 ## Knowledge Layer (Vault)
 
-The Obsidian vault (`mcp-obsidian`) is the agent's **sole configured knowledge store** for customer context, decisions, and durable memory. There is no built-in secondary memory layer — if the vault is unavailable, the agent operates statelessly (CRM-only), and users can configure their own persistence layer as they see fit.
+The Obsidian vault (via the **OIL** MCP server — `oil`) is the agent's **sole configured knowledge store** for customer context, decisions, and durable memory. There is no built-in secondary memory layer — if the vault is unavailable, the agent operates statelessly (CRM-only), and users can configure their own persistence layer as they see fit.
 
-### Obsidian Vault (`mcp-obsidian`)
+### Obsidian Intelligence Layer (OIL)
 
 - The vault defines the **active customer roster** — only customers with `Customers/<Name>.md` files are in scope for proactive workflows.
-- **Vault Protocol Phases**: Use the named phases (VAULT-PREFETCH, VAULT-CORRELATE, VAULT-PROMOTE, VAULT-HYGIENE) defined in `obsidian-vault.instructions.md` § Vault Protocol Phases. All phases are conditional — skipped automatically if `mcp-obsidian` is unavailable.
-- **Before CRM queries (MANDATORY)**: read vault `Customers/<Name>.md` to extract opportunity GUIDs, account IDs, and team context. Use these IDs directly in CRM queries — do NOT run CRM discovery queries (e.g., `list_opportunities`, `crm_query` on `accounts`) for customers that have vault files with IDs already stored. The vault is the customer→MSX ID bridge.
-- **After CRM workflows**: promote validated findings to the vault (`## Agent Insights` on the customer file). If you discovered new opportunity GUIDs or IDs during the workflow, add them to the customer's `## Opportunities` section so future queries can use them directly.
+- **Vault Protocol Phases**: Use the named phases (VAULT-PREFETCH, VAULT-CORRELATE, VAULT-PROMOTE, VAULT-HYGIENE) defined in `obsidian-vault.instructions.md` § Vault Protocol Phases. All phases are conditional — skipped automatically if OIL is unavailable.
+- **Before CRM queries (MANDATORY)**: call `get_customer_context({ customer: "<Name>" })` to get assembled customer context (opportunities with GUIDs, team, action items). Use returned IDs directly in CRM queries — do NOT run CRM discovery queries for identifiers OIL already provides. Use `prepare_crm_prefetch()` for pre-built OData filter strings.
+- **After CRM workflows**: promote validated findings to the vault via `promote_findings()` or `patch_note()` with `heading: "Agent Insights"`. If you discovered new opportunity GUIDs during the workflow, use `update_customer_file()` to add them to the customer's `## Opportunities` section.
 - **Vault scopes, CRM validates**: use vault for *who/what/why* context and **identifier resolution**; use CRM for *current state* data. Never substitute cached vault data for live CRM status on complex operations (writes, risk assessment, governance).
 - See `.github/instructions/obsidian-vault.instructions.md` for full conventions, freshness rules, and workflow integration.
 
 ### No Vault? No Problem
 
-If `mcp-obsidian` is not configured, the agent works fine — it just loses persistent memory across sessions. CRM is always the source of truth for live state. Users who want cross-session context without Obsidian can bring their own persistence layer (local files, another MCP server, etc.). The agent does not assume any specific fallback directory structure.
+If OIL is not configured, the agent works fine — it just loses persistent memory across sessions. CRM is always the source of truth for live state. Users who want cross-session context without Obsidian can bring their own persistence layer (local files, another MCP server, etc.). The agent does not assume any specific fallback directory structure.
 
 ## Connect Hooks (Evidence Capture)
 

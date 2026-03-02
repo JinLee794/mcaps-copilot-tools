@@ -112,27 +112,39 @@ Copy-paste any of these into the Copilot chat window after you've started the MC
 
 ## Optional: Enable Obsidian Vault Integration
 
-If you use [Obsidian](https://obsidian.md/) as a local knowledge base, you can connect it as an additional MCP server. This gives Copilot read/write access to your vault for durable customer notes, prior findings, and session context.
+If you use [Obsidian](https://obsidian.md/) as a local knowledge base, you can connect it via the **Obsidian Intelligence Layer (OIL)** — a domain-specific MCP server that turns your vault into a semantic knowledge graph for AI agents. Instead of raw file reads, OIL gives agents pre-indexed search, context-aware composites, and gated writes.
 
 ### How to enable it
 
-1. Open `.vscode/mcp.json` in your editor.
-2. Find the commented-out `"mcp-obsidian"` block (around line 23).
-3. Uncomment the entire block so it looks like this:
+1. **Clone and build OIL:**
+   ```bash
+   git clone https://github.com/JinLee794/Obsidian-Intelligence-Layer.git
+   cd Obsidian-Intelligence-Layer
+   npm install
+   npm run build
+   ```
+
+2. Open `.vscode/mcp.json` in your editor.
+3. Find the commented-out `"oil"` block and uncomment it so it looks like this:
 
 ```jsonc
-"mcp-obsidian": {
-    "command": "npx",
-    "args": [
-        "@mauricio.wolff/mcp-obsidian@latest",
-        "${input:obsidianVaultPath}"
-    ]
-},
+"oil": {
+    "type": "stdio",
+    "command": "node",
+    "args": ["dist/index.js"],
+    "cwd": "/absolute/path/to/Obsidian-Intelligence-Layer",
+    "env": {
+        "OBSIDIAN_VAULT_PATH": "${input:obsidianVaultPath}"
+    }
+}
 ```
 
-4. When prompted, enter the absolute path to your Obsidian vault (e.g., `/Users/yourname/Documents/MyVault`).
-   - Alternatively, set the `OBSIDIAN_VAULT_PATH` environment variable and it will use that as the default.
-5. Click **Start** on `mcp-obsidian` in VS Code just like the other servers.
+4. When prompted, enter the absolute path to:
+   - **OIL server** (`dist/index.js` inside your OIL clone) — or set the `OIL_SERVER_PATH` environment variable.
+   - **Your Obsidian vault** (e.g., `/Users/yourname/Documents/MyVault`) — or set `OBSIDIAN_VAULT_PATH`.
+5. Click **Start** on `oil` in VS Code just like the other servers.
+
+OIL exposes **22 domain-specific tools** including `get_customer_context`, `search_vault`, `prepare_crm_prefetch`, `promote_findings`, `check_vault_health`, and more. See the [OIL README](https://github.com/JinLee794/Obsidian-Intelligence-Layer) for the full tools reference.
 
 > **Don't use Obsidian?** No worries — everything works without it. The system operates statelessly (CRM-only) and you can bring your own persistence layer if desired.
 
@@ -233,7 +245,7 @@ You (Copilot Chat)
   │
   ├── asks about CRM data ──→ msx-crm MCP server ──→ MSX Dynamics 365
   ├── asks about M365 data ──→ workiq MCP server  ──→ Teams / Outlook / SharePoint
-  └── asks about notes     ──→ mcp-obsidian (optional) ──→ Your Obsidian Vault
+  └── asks about notes     ──→ OIL (optional)          ──→ Your Obsidian Vault
 ```
 
 1. You type a question or action in Copilot chat.
@@ -264,7 +276,7 @@ The file [.vscode/mcp.json](.vscode/mcp.json) defines which MCP servers are avai
 |---|---|---|---|
 | `msx-crm` | **Enabled** | MSX CRM operations | `crm_whoami`, `crm_query`, `list_opportunities`, `get_milestones`, `create_task`, etc. |
 | `workiq` | **Enabled** | Microsoft 365 evidence retrieval | `ask_work_iq` (Teams, Outlook, SharePoint) |
-| `mcp-obsidian` | Commented out | Obsidian vault integration | `read_note`, `write_note`, `search_notes`, etc. |
+| `oil` | Commented out | Obsidian Intelligence Layer | `get_customer_context`, `search_vault`, `prepare_crm_prefetch`, `promote_findings`, etc. |
 
 You can add any MCP-compatible server to this file. See the [Customization](#customization--make-it-yours) section for examples.
 

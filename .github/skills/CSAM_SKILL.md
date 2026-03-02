@@ -160,7 +160,7 @@ When this model is explicit, CSAM friction is treated as upstream ambiguity to c
 
 #### Upfront Scoping Pattern (minimize context expansion)
 Collect relevant scope in as few calls as possible before branching into per-milestone workflows:
-0. **VAULT-PREFETCH** — read vault customer roster and context to scope CRM queries. Skipped automatically if `mcp-obsidian` is unavailable (see `obsidian-vault.instructions.md` § Vault Protocol Phases).
+0. **VAULT-PREFETCH** — read vault customer roster and context to scope CRM queries. Skipped automatically if OIL is unavailable (see `obsidian-vault.instructions.md` § Vault Protocol Phases).
 1. `get_my_active_opportunities()` — one call returns all active opps with customer names (use `customerKeyword` to narrow).
 2. `get_milestones({ opportunityId, statusFilter: 'active', format: 'summary' })` — compact grouped output instead of full records.
 3. Only call `get_milestone_activities(milestoneId)` for specific milestones needing investigation.

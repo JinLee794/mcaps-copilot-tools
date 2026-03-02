@@ -1,5 +1,5 @@
 ---
-description: "Obsidian vault integration — local knowledge layer, customer roster, durable storage, CRM prefetch context, Connect hook routing. Use when reasoning about vault reads, customer defaults, durable memory, Obsidian notes, mcp-obsidian tools, customer roster filtering, vault-first storage, or cross-medium context assembly."
+description: "Obsidian vault integration — local knowledge layer, customer roster, durable storage, CRM prefetch context, Connect hook routing. Use when reasoning about vault reads, customer defaults, durable memory, Obsidian notes, OIL tools, customer roster filtering, vault-first storage, or cross-medium context assembly."
 ---
 
 # Obsidian Vault — Local Knowledge Layer
@@ -36,7 +36,7 @@ Templates/
 
 ### Frontmatter Conventions
 
-All note types use YAML frontmatter for structured retrieval via `search_notes`. Consistent keys enable cross-note queries.
+All note types use YAML frontmatter for structured retrieval via `query_notes` or `search_vault`. Consistent keys enable cross-note queries.
 
 | Key | Used In | Type | Purpose |
 |---|---|---|---|
@@ -66,30 +66,60 @@ Each customer file is the single source of local truth for that customer. Sectio
 
 **ID Storage Rule**: When the agent discovers MSX identifiers during a CRM workflow (opportunity GUIDs, account IDs, TPIDs, milestone numbers), it MUST write them back to the customer file so future VAULT-PREFETCH steps can use them directly. An opportunity entry without a GUID is incomplete.
 
-### MCP Obsidian Tool Reference
+### OIL Tool Reference
 
-When reading or writing vault notes, use these `mcp-obsidian` tools:
+The vault is managed by the **Obsidian Intelligence Layer (OIL)** MCP server (`oil`). OIL provides 22 domain-specific tools organized into four categories:
+
+#### Orient (read-only context)
 
 | Operation | Tool | Key Parameters |
 |---|---|---|
-| List folder contents | `list_directory` | `path` (e.g., `Customers/`) |
-| Read a note | `read_note` | `path` (e.g., `Customers/Contoso.md`) |
-| Read multiple notes | `read_multiple_notes` | `paths` array |
-| Search by content | `search_notes` | `query`, optional frontmatter search |
-| Create a new note | `write_note` | `path`, `content` |
-| Append to a section | `patch_note` | `path`, `operation: "append"`, `heading` |
-| Get frontmatter | `get_frontmatter` | `path` |
-| Update frontmatter | `update_frontmatter` | `path`, `properties` |
-| List/add tags | `manage_tags` | `path`, `action`, `tags` |
+| Vault map & health | `get_vault_context` | *(none)* — returns folder tree, note count, top tags, active customers. **Call first in any new session.** |
+| Customer context | `get_customer_context` | `customer` — returns assembled context: opportunities (with GUIDs), team, meetings, action items, insights |
+| Person context | `get_person_context` | `person` — returns person profile, customer associations, org type, linked notes |
+| Graph traversal | `query_graph` | `path`, `direction`, `depth`, `filter` — backlinks, forward links, N-hop neighborhood |
+| People→Customer batch | `resolve_people_to_customers` | `people` array — batch-resolves person names to customer associations |
+
+#### Retrieve (search/query)
+
+| Operation | Tool | Key Parameters |
+|---|---|---|
+| Unified search | `search_vault` | `query` — 3-tier search: lexical → fuzzy → semantic. Ranked results with scores |
+| Frontmatter query | `query_notes` | `where`, `and`, `or`, `order_by`, `limit` — SQL-like frontmatter query |
+| Find similar | `find_similar_notes` | `path` or `text` — similarity by tags or semantic embeddings |
+
+#### Write (gated modifications)
+
+| Operation | Tool | Gate | Key Parameters |
+|---|---|---|---|
+| Append to section | `patch_note` | Auto / Gated | `path`, `heading`, `content`, `operation` — auto-confirmed for "Agent Insights", "Connect Hooks" |
+| Connect evidence | `capture_connect_hook` | Auto | `customer`, `hook` — appends to customer file + backup |
+| Audit trail | `log_agent_action` | Auto | `action`, `detail` — writes to `_agent-log/` |
+| Meeting note | `draft_meeting_note` | Gated | `customer`, `date`, `attendees` — generates from template |
+| Update customer | `update_customer_file` | Gated | `customer`, `section`, `content` — proposes frontmatter/section changes |
+| Create customer | `create_customer_file` | Gated | `customer` — scaffolds new customer file |
+| Write note | `write_note` | Gated | `path`, `content` — low-level write, always gated |
+| Batch tags | `apply_tags` | Gated | `paths`, `action`, `tags` — batch tag add/remove |
+| Manage pending | `manage_pending_writes` | — | `action` — list, confirm, or reject queued writes |
+
+#### Composite (multi-step workflows)
+
+| Operation | Tool | Key Parameters |
+|---|---|---|
+| CRM prefetch | `prepare_crm_prefetch` | `customers` array — extracts GUIDs/TPIDs and returns pre-built OData filter strings |
+| Entity correlation | `correlate_with_vault` | `entities` — batch-resolves external entities (people, meetings) against vault notes |
+| Promote findings | `promote_findings` | `findings` array — batch-promotes validated findings to customer files |
+| Vault health | `check_vault_health` | *(none)* — surfaces stale insights, missing IDs, incomplete sections, orphaned notes |
+| Drift report | `get_drift_report` | *(none)* — compares vault snapshots against expected CRM state |
 
 ## Vault Protocol Phases
 
-Skills reference these phases by name (e.g., "run VAULT-PREFETCH") instead of duplicating vault logic. Each phase includes an **availability guard** — if `mcp-obsidian` is unreachable, the phase is skipped gracefully and the workflow continues with fallback behavior.
+Skills reference these phases by name (e.g., "run VAULT-PREFETCH") instead of duplicating vault logic. Each phase includes an **availability guard** — if OIL is unreachable, the phase is skipped gracefully and the workflow continues with fallback behavior.
 
 ### Availability Guard (all phases)
 
 Before executing any vault phase:
-1. Attempt `list_directory` at the vault root (e.g., path `Customers/`).
+1. Attempt `get_vault_context()` — this returns the vault map (folder tree, note count, top tags, active customers).
 2. If reachable → proceed with the phase.
 3. If unreachable → skip the phase, apply the phase-specific fallback, and continue the workflow without breaking.
 
@@ -97,20 +127,20 @@ Cache the availability result for the duration of the current workflow — do no
 
 ### VAULT-PREFETCH
 
-**When**: Before any CRM query or multi-customer workflow. **This is mandatory when `mcp-obsidian` is available** — do not skip it in favor of going directly to CRM tools.
+**When**: Before any CRM query or multi-customer workflow. **This is mandatory when OIL is available** — do not skip it in favor of going directly to CRM tools.
 **Purpose**: Resolve customer→MSX identifiers from vault notes so CRM queries use precise IDs instead of broad discovery.
 
 Steps:
 1. Run availability guard.
-2. Read `Customers/` directory to identify the active roster.
-3. If targeting a specific customer, call `read_note("Customers/<Name>.md")` and extract:
-   - **Opportunity GUIDs** from the `## Opportunities` section (e.g., `opportunityid: 00000000-0000-0000-0000-000000000000`). These go directly into CRM `$filter` expressions (`_msp_opportunityid_value eq '<GUID>'`).
-   - **Account TPID / Account ID** from frontmatter fields (`tpid`, `accountid`) — use for account-scoped CRM filters.
-   - **Milestone IDs or numbers** if previously recorded under `## Milestones`.
+2. Call `get_vault_context()` to identify the active customer roster.
+3. If targeting a specific customer, call `get_customer_context({ customer: "<Name>" })` — this returns assembled context in one call:
+   - **Opportunity GUIDs** (e.g., `opportunityid: 00000000-0000-0000-0000-000000000000`). These go directly into CRM `$filter` expressions (`_msp_opportunityid_value eq '<GUID>'`).
+   - **Account TPID / Account ID** — use for account-scoped CRM filters.
+   - **Milestone IDs or numbers** if previously recorded.
    - **Team composition** — identifies relevant owners for `_ownerid_value` filters.
    - **Prior Agent Insights** — avoid re-running queries for already-validated findings.
-4. Use vault-provided IDs to scope the CRM query precisely — pass opportunity GUIDs to `crm_query` filters, `get_milestones({ opportunityId })`, or composite tools like `find_milestones_needing_tasks`.
-5. For multi-customer workflows, read multiple customer files (`read_multiple_notes`) to collect all relevant IDs in one pass.
+4. For CRM-ready OData filters, use `prepare_crm_prefetch({ customers: ["<Name>"] })` — returns pre-built filter strings ready to paste into `crm_query`.
+5. For multi-customer workflows, call `prepare_crm_prefetch({ customers: ["Contoso", "Fabrikam", ...] })` to collect all relevant IDs in one pass.
 
 **Critical rule**: If the vault has the opportunity GUID for a customer, use it directly. Do NOT call `list_opportunities({ customerKeyword })` or `crm_query` on `accounts` to rediscover an ID the vault already provides.
 
@@ -124,9 +154,9 @@ Steps:
 
 Steps:
 1. Run availability guard.
-2. **People→Customer resolution**: Search vault `People/` notes (`search_notes` with tag `people` or list `People/` directory) to build a lookup of person → customer associations using frontmatter fields `customers`, `company`, and `org`. This enables attributing M365 activity (meetings, chats, emails) to specific customer accounts based on who participated.
-3. Search vault by customer name and date range using `search_notes` (frontmatter `customer` + `date` fields). Use resolved customer names from step 2 to target searches when the originating query didn't specify a customer.
-4. Read matched notes (`read_note` or `read_multiple_notes`) for relevant context.
+2. **People→Customer resolution**: Call `resolve_people_to_customers({ people: [...] })` to batch-resolve person names to customer associations. This enables attributing M365 activity (meetings, chats, emails) to specific customer accounts based on who participated.
+3. For richer correlation, call `correlate_with_vault({ entities: [...] })` — batch-resolves external entities (people, meetings from M365) against vault notes with confidence scoring.
+4. Search vault by customer name and date range using `query_notes` (frontmatter `customer` + `date` fields). Use resolved customer names from step 2 to target searches.
 5. Surface connections: prior meeting notes, decisions, and action items that relate to the retrieved evidence.
 6. Return the people→customer lookup to the calling workflow for downstream attribution (e.g., WorkIQ entity resolution, output grouping by customer).
 
@@ -145,10 +175,10 @@ Steps:
 
 Steps:
 1. Run availability guard.
-2. Append findings to `Customers/<Name>.md` under `## Agent Insights` using `patch_note` with `operation: "append"` and `heading: "Agent Insights"`.
+2. Use `promote_findings()` to batch-promote validated findings to customer files. This auto-confirms for designated sections ("Agent Insights", "Connect Hooks") and gates other sections for review.
 3. Include datestamp (`YYYY-MM-DD`) and brief summary of what was found or changed.
-4. If no customer file exists and the customer is now actively tracked, create `Customers/<Name>.md` with the findings.
-5. For Connect hooks: append to `## Connect Hooks` on the customer file (primary), and `.connect/hooks/hooks.md` (backup).
+4. If no customer file exists and the customer is now actively tracked, use `create_customer_file({ customer: "<Name>" })` to scaffold it with the findings.
+5. For Connect hooks: use `capture_connect_hook({ customer: "<Name>", hook: { ... } })` — this appends to the customer file and creates a backup automatically.
 
 **Do NOT promote**: speculative, unvalidated, or redundant information.
 **Fallback (no vault)**: Write to `.connect/hooks/hooks.md` only. Durable memory is not available without a configured persistence layer.
@@ -160,9 +190,10 @@ Steps:
 
 Steps:
 1. Run availability guard.
-2. Check `## Agent Insights` timestamps — flag entries older than 30 days as potentially stale.
-3. Cross-reference vault customer roster with `get_my_active_opportunities()` — flag gaps (CRM customers not in vault, vault customers with no active CRM opps).
-4. Recommend additions/removals to the user — do not auto-delete vault content.
+2. Call `check_vault_health()` — this surfaces stale insights, missing IDs, incomplete sections, and orphaned notes in one call.
+3. Cross-reference the vault health report with `get_my_active_opportunities()` — flag gaps (CRM customers not in vault, vault customers with no active CRM opps).
+4. For deeper analysis, call `get_drift_report()` to compare vault snapshots against expected CRM state.
+5. Recommend additions/removals to the user — do not auto-delete vault content.
 
 **Skip when**: Not explicitly requested or not part of a governance cadence.
 **Fallback (no vault)**: Ask the user for customer names or use `crm_whoami` context. No automatic roster approximation without a configured persistence layer.
@@ -175,12 +206,12 @@ Steps:
 
 **Before any CRM query workflow**, check the vault for relevant customer context:
 
-1. Read the user's vault `Customers/` directory to identify the active roster.
-2. If the query targets a specific customer, read `Customers/<Name>.md` to extract:
+1. Call `get_vault_context()` to identify the active customer roster.
+2. If the query targets a specific customer, call `get_customer_context({ customer: "<Name>" })` to get:
    - Known opportunity names/IDs (avoids discovery queries).
    - Team composition (identifies relevant owners for filtering).
    - Prior findings and open items (avoids redundant queries).
-3. Use vault context to **scope** the CRM query — filter by known opportunity IDs, target specific milestones, or skip customers the user doesn't track.
+3. For CRM-ready filters, use `prepare_crm_prefetch({ customers: ["<Name>"] })` to get pre-built OData filter strings.
 
 **When to skip vault prefetch:**
 - The user provides an explicit opportunity ID or customer name not in the vault.
@@ -204,19 +235,18 @@ Steps:
 
 After completing a CRM query or write workflow, promote **validated findings** back to the vault:
 
-1. Append findings to the relevant `Customers/<Name>.md` under `## Agent Insights`.
+1. Use `promote_findings()` to batch-promote findings to the relevant `Customers/<Name>.md` files under `## Agent Insights`.
 2. Include a datestamp and brief summary of what was found/changed.
-3. If no customer file exists and the customer is now being actively tracked, create `Customers/<Name>.md` with the findings.
+3. If no customer file exists and the customer is now being actively tracked, use `create_customer_file({ customer: "<Name>" })` to scaffold it.
 4. Do NOT promote speculative or unvalidated information.
 
 ### 4. Connect Hook Storage
 
 When capturing Connect-relevant evidence:
 
-1. **Primary**: Append to `Customers/<Name>.md` under `## Connect Hooks` (use `patch_note` with `operation: "append"` and `heading: "Connect Hooks"`).
-2. **Create section** if `## Connect Hooks` doesn't exist in the file.
-3. **Create file** if no customer file exists — minimal header + hook entry.
-4. **Local backup**: Always also write to `.connect/hooks/hooks.md` for repo-tracked persistence.
+1. **Primary**: Use `capture_connect_hook({ customer: "<Name>", hook: { ... } })` — this appends to the customer file under `## Connect Hooks` and creates a backup automatically.
+2. **Create file** if no customer file exists — use `create_customer_file({ customer: "<Name>" })` first, then capture the hook.
+3. **Fallback**: If OIL is unavailable, write to `.connect/hooks/hooks.md` for repo-tracked persistence.
 
 See `.github/instructions/connect-hooks.instructions.md` for the hook schema and formatting rules.
 
@@ -232,7 +262,7 @@ The vault customer roster acts as a **default filter** for multi-customer operat
 
 > The Vault Protocol Phases above include per-phase fallback instructions. This section provides the consolidated fallback reference.
 
-When `mcp-obsidian` is unreachable (availability guard fails):
+When OIL is unreachable (availability guard fails):
 - The agent operates **statelessly** — no persistent memory across sessions. CRM remains the source of truth for live state.
 - CRM query scoping reverts to asking the user for customer names or using `crm_whoami` context.
 - Connect hooks go to `.connect/hooks/hooks.md` only.
