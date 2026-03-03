@@ -1,0 +1,9 @@
+{
+    "servers": {
+        "msx-crm": {
+            "type": "stdio",
+            "command": "node",
+            "args": ["mcp-server/src/index.js"]
+        }
+    }
+}
