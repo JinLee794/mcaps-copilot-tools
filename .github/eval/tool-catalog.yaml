@@ -1,0 +1,227 @@
+# MCP Tool Catalog — tool name + description pairs used by score-tool-routing.mjs
+# Descriptions are routing signals that the LLM uses to decide which tool to invoke.
+# Sourced from mcp/msx/README.md and mcp/oil/README.md tool reference tables.
+
+tools:
+  # ── MSX CRM Server ─────────────────────────────────────────────
+  # Read tools
+  - server: msx
+    name: crm_whoami
+    description: "Validate CRM access and return current user identity"
+
+  - server: msx
+    name: crm_auth_status
+    description: "Check authentication status — user, expiry, CRM URL"
+
+  - server: msx
+    name: crm_query
+    description: "Execute read-only OData GET against any Dynamics 365 entity set (supports $filter, $select, $orderby, $top, $expand, auto-pagination)"
+
+  - server: msx
+    name: crm_get_record
+    description: "Retrieve a single Dynamics 365 record by entity set and GUID"
+
+  - server: msx
+    name: list_opportunities
+    description: "List open opportunities by account IDs or customer name keyword"
+
+  - server: msx
+    name: get_my_active_opportunities
+    description: "Active opportunities where you are the owner or have milestone ownership"
+
+  - server: msx
+    name: get_milestones
+    description: "Get engagement milestones by ID, number, opportunity, owner, or mine — with status/keyword/task-presence filtering"
+
+  - server: msx
+    name: get_milestone_activities
+    description: "Tasks and activities linked to one or more milestones"
+
+  - server: msx
+    name: find_milestones_needing_tasks
+    description: "Composite: customer keywords → accounts → opportunities → milestones → identifies those without tasks"
+
+  - server: msx
+    name: list_accounts_by_tpid
+    description: "Find accounts by MS Top Parent ID (TPID)"
+
+  - server: msx
+    name: get_task_status_options
+    description: "Retrieve valid task status and statuscode options from CRM metadata"
+
+  # Visualization tools
+  - server: msx
+    name: view_milestone_timeline
+    description: "Timeline-friendly milestone events with render hints"
+
+  - server: msx
+    name: view_opportunity_cost_trend
+    description: "Monthly cost and consumption trend with chart render hints"
+
+  - server: msx
+    name: view_staged_changes_diff
+    description: "Before/after diff table from staged write payloads"
+
+  # Write tools (staged)
+  - server: msx
+    name: create_task
+    description: "Create a task linked to an engagement milestone — staged for approval"
+
+  - server: msx
+    name: update_task
+    description: "Update task fields (subject, due date, description, status) — staged for approval"
+
+  - server: msx
+    name: close_task
+    description: "Close a task via CloseTask action — staged for approval"
+
+  - server: msx
+    name: update_milestone
+    description: "Update milestone fields (date, monthly use, comments) in CRM — staged for approval"
+
+  # Approval queue tools
+  - server: msx
+    name: list_pending_operations
+    description: "Show all staged changes awaiting approval"
+
+  - server: msx
+    name: execute_operation
+    description: "Execute a single staged operation by ID"
+
+  - server: msx
+    name: execute_all
+    description: "Execute all pending operations in sequence"
+
+  - server: msx
+    name: cancel_operation
+    description: "Discard a staged operation by ID"
+
+  - server: msx
+    name: cancel_all
+    description: "Discard all pending operations"
+
+  # ── OIL (Obsidian Intelligence Layer) Server ────────────────────
+  # Orient tools
+  - server: oil
+    name: get_vault_context
+    description: "High-level vault map — folder tree, note count, top tags, most-linked notes. The agent's first call in any new session."
+
+  - server: oil
+    name: get_customer_context
+    description: "Full assembled context for a named customer — customer file content, opportunities with GUIDs, team composition, recent meetings, linked people, open action items, and agent insights."
+
+  - server: oil
+    name: get_person_context
+    description: "Person vault profile — customer associations, org type, company, and linked notes. Used for M365 entity resolution."
+
+  - server: oil
+    name: query_graph
+    description: "Graph traversal — backlinks, forward links, or N-hop neighborhood with tag and folder filters."
+
+  - server: oil
+    name: resolve_people_to_customers
+    description: "Batch resolution of person names to customer associations. Primary tool for WorkIQ entity resolution."
+
+  - server: oil
+    name: get_opportunity_context
+    description: "Returns all opportunities for a customer as structured data from vault — GUID, status, stage, owner, and salesplay."
+
+  - server: oil
+    name: get_milestone_context
+    description: "Returns all milestones for a customer as structured data from vault — ID, number, status, date, owner, and linked opportunity."
+
+  # Retrieve tools
+  - server: oil
+    name: search_vault
+    description: "Unified search across lexical, fuzzy, and semantic tiers. Returns ranked results matching the query."
+
+  - server: oil
+    name: query_notes
+    description: "Frontmatter predicate query — relational-style filtering across all notes. The SQL-like layer for the vault."
+
+  - server: oil
+    name: find_similar_notes
+    description: "Tag-based or semantic similarity to a given note — surfaces relevant patterns, comparable customers, or risk signals."
+
+  - server: oil
+    name: read_note
+    description: "Read the raw content of a specific note from the vault by path."
+
+  # Write tools
+  - server: oil
+    name: patch_note
+    description: "Append or prepend content to a heading section within a note. Auto-confirmed for Agent Insights and Connect Hooks; gated for others."
+
+  - server: oil
+    name: capture_connect_hook
+    description: "Appends a formatted Connect hook evidence entry to the customer file and backup location. Always auto-confirmed."
+
+  - server: oil
+    name: log_agent_action
+    description: "Records an agent decision, recommendation, or reasoning trace to _agent-log/. Always auto-confirmed audit trail."
+
+  - server: oil
+    name: draft_meeting_note
+    description: "Generates a structured meeting note from template. Gated — returns a diff for review before creation."
+
+  - server: oil
+    name: update_customer_file
+    description: "Proposes updates to a customer file's frontmatter or sections. Gated — returns a diff for review."
+
+  - server: oil
+    name: create_customer_file
+    description: "Scaffolds a new customer file when onboarding a new account. Gated — creates a new file in the vault."
+
+  - server: oil
+    name: write_note
+    description: "Low-level note write wrapped in the confirmation gate. Always gated regardless of mode."
+
+  - server: oil
+    name: apply_tags
+    description: "Proposes tag additions or removals across a set of notes. Gated — shows a batch diff of all notes affected."
+
+  - server: oil
+    name: manage_pending_writes
+    description: "List, confirm, or reject queued vault writes."
+
+  # Composite tools
+  - server: oil
+    name: prepare_crm_prefetch
+    description: "VAULT-PREFETCH — extracts all vault-known MSX identifiers (opportunity GUIDs, TPIDs, account IDs, milestone IDs) for one or more customers. Returns structured data with pre-built OData filter strings ready for crm_query."
+
+  - server: oil
+    name: correlate_with_vault
+    description: "VAULT-CORRELATE — cross-references external entities (people, customers, meetings, opportunities) with vault notes. Returns matched notes, people-to-customer associations, and unresolved entities with confidence scoring."
+
+  - server: oil
+    name: promote_findings
+    description: "VAULT-PROMOTE — batch-promotes validated findings to customer files. Auto-confirmed for designated sections; gated for others. Generates a batch diff when multiple customers are affected."
+
+  - server: oil
+    name: check_vault_health
+    description: "VAULT-HYGIENE — comprehensive vault health report. Surfaces stale Agent Insights, incomplete opportunity/milestone IDs, missing sections, orphaned meetings, and roster gaps."
+
+  - server: oil
+    name: get_drift_report
+    description: "Structures vault-side opportunity, milestone, and team data for a customer so the copilot can compare against live CRM state. Returns a snapshot shaped for drift detection."
+
+  - server: oil
+    name: create_milestone
+    description: "Creates a milestone entity sub-note in a customer file within the vault."
+
+  - server: oil
+    name: create_opportunity
+    description: "Creates an opportunity entity sub-note in a customer file within the vault."
+
+  - server: oil
+    name: update_opportunity
+    description: "Updates an existing opportunity entity sub-note in a customer vault file."
+
+  - server: oil
+    name: migrate_customer_structure
+    description: "Migrates a customer file structure from inline sections to entity sub-notes format."
+
+  # ── WorkIQ MCP Server ──────────────────────────────────────────
+  - server: workiq
+    name: ask_work_iq
+    description: "Query M365 work signals — Teams messages, Outlook emails, SharePoint documents, and meeting transcripts. Scoped natural language search for communication evidence."

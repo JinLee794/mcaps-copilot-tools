@@ -9,11 +9,21 @@
     "eval:compare": "node score-routing.mjs --arch compare",
     "eval:main": "node score-routing.mjs --arch main",
     "eval:branch": "node score-routing.mjs --arch branch",
+    "loading": "node score-loading.mjs",
+    "loading:lazy": "node score-loading.mjs --strategy lazy",
+    "loading:hybrid": "node score-loading.mjs --strategy hybrid",
+    "loading:preloaded": "node score-loading.mjs --strategy preloaded",
     "sweep": "node threshold-sweep.mjs",
     "confusion": "node confusion-matrix.mjs",
+    "tools": "node score-tool-routing.mjs",
+    "tools:brief": "node score-tool-routing.mjs --brief",
+    "tools:msx": "node score-tool-routing.mjs --server msx",
+    "tools:oil": "node score-tool-routing.mjs --server oil",
     "lint": "node lint-descriptions.mjs",
     "lint:all": "node lint-descriptions.mjs --all",
-    "all": "node score-routing.mjs && node threshold-sweep.mjs && node confusion-matrix.mjs && node lint-descriptions.mjs"
+    "lint:inst": "node lint-instructions.mjs",
+    "lint:cross": "node lint-instructions.mjs --cross",
+    "all": "node score-routing.mjs && node score-loading.mjs && node score-tool-routing.mjs && node threshold-sweep.mjs && node confusion-matrix.mjs && node lint-descriptions.mjs && node lint-instructions.mjs --cross"
   },
   "dependencies": {
     "@xenova/transformers": "^2.17.0",

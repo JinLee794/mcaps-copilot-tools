@@ -263,3 +263,692 @@ cases:
     expected:
       main: [CSAM_SKILL.md]
       branch: [adoption-excellence-review-SKILL.md]
+
+  # ══════════════════════════════════════════════════════════════════
+  # CONTEXT LOADING EVAL — New test dimensions
+  # ══════════════════════════════════════════════════════════════════
+
+  # ── Instruction routing tests ───────────────────────────────────
+  # These test whether instruction files get correctly matched by
+  # their description field when relevant queries appear.
+
+  - id: inst-crm-schema
+    query: "What entity set name do I use for crm_query on opportunities?"
+    role: any
+    stage: any
+    category: instruction-routing
+    expected:
+      main: []
+      branch: []
+    expected_unified:
+      - crm-entity-schema.instructions.md
+
+  - id: inst-mcem-flow
+    query: "What are the MCEM exit criteria for Stage 3?"
+    role: any
+    stage: 3
+    category: instruction-routing
+    expected:
+      main: []
+      branch: [exit-criteria-validation-SKILL.md]
+    expected_unified:
+      - mcem-flow.instructions.md
+      - exit-criteria-validation-SKILL.md
+
+  - id: inst-shared-patterns
+    query: "What's the VAULT-PREFETCH scoping pattern?"
+    role: any
+    stage: any
+    category: instruction-routing
+    expected:
+      main: []
+      branch: []
+    expected_unified:
+      - shared-patterns.instructions.md
+
+  - id: inst-intent
+    query: "What's the agent system's overarching purpose and multi-medium model?"
+    role: any
+    stage: any
+    category: instruction-routing
+    expected:
+      main: []
+      branch: []
+    expected_unified:
+      - intent.instructions.md
+
+  - id: inst-crm-query-strategy
+    query: "How should I scope CRM reads to avoid oversized payloads?"
+    role: any
+    stage: any
+    category: instruction-routing
+    expected:
+      main: []
+      branch: []
+    expected_unified:
+      - crm-query-strategy.instructions.md
+
+  - id: inst-vault
+    query: "How do I use the Obsidian vault for customer context prefetch?"
+    role: any
+    stage: any
+    category: instruction-routing
+    expected:
+      main: []
+      branch: []
+    expected_unified:
+      - obsidian-vault.instructions.md
+      - vault-context-assembly-SKILL.md
+
+  - id: inst-connect-hooks
+    query: "How do I capture Connect evidence from a customer meeting?"
+    role: any
+    stage: any
+    category: instruction-routing
+    expected:
+      main: []
+      branch: []
+    expected_unified:
+      - connect-hooks.instructions.md
+
+  - id: inst-write-gate
+    query: "What are the rules for CRM write operations and human-in-the-loop?"
+    role: any
+    stage: any
+    category: instruction-routing
+    expected:
+      main: []
+      branch: []
+    expected_unified:
+      - msx-role-and-write-gate.instructions.md
+
+  # ── Role card instruction tests ─────────────────────────────────
+  - id: inst-role-specialist
+    query: "I'm a Specialist, what's my pipeline building workflow?"
+    role: Specialist
+    stage: any
+    category: instruction-routing
+    expected:
+      main: [Specialist_SKILL.md]
+      branch: [pipeline-qualification-SKILL.md]
+    expected_unified:
+      - role-card-specialist.instructions.md
+      - pipeline-qualification-SKILL.md
+
+  - id: inst-role-csa
+    query: "As a CSA, what's my delivery accountability scope?"
+    role: CSA
+    stage: any
+    category: instruction-routing
+    expected:
+      main: [Cloud_Solution_Architect_SKILL.md]
+      branch: [delivery-accountability-mapping-SKILL.md]
+    expected_unified:
+      - role-card-csa.instructions.md
+
+  - id: inst-role-csam
+    query: "I'm a CSAM, walk me through my hygiene cadence"
+    role: CSAM
+    stage: any
+    category: instruction-routing
+    expected:
+      main: [CSAM_SKILL.md]
+      branch: [milestone-health-review-SKILL.md]
+    expected_unified:
+      - role-card-csam.instructions.md
+
+  - id: inst-role-se
+    query: "As a Solution Engineer, what are my boundary rules?"
+    role: SE
+    stage: any
+    category: instruction-routing
+    expected:
+      main: [Solution_Engineer_SKILL.md]
+      branch: [task-hygiene-flow-SKILL.md]
+    expected_unified:
+      - role-card-se.instructions.md
+
+  # ── Single-shot efficiency tests ────────────────────────────────
+  # Simple queries that should resolve directly via CRM tool calls
+  # WITHOUT activating any skill. At most one instruction may match.
+  # Tests whether the routing tax can be avoided.
+
+  - id: single-get-opp
+    query: "Get the details for opportunity OPP-12345"
+    role: any
+    stage: any
+    category: single-shot
+    expected:
+      main: []
+      branch: []
+    expected_unified: []
+
+  - id: single-whoami
+    query: "Who am I in CRM?"
+    role: any
+    stage: any
+    category: single-shot
+    expected:
+      main: []
+      branch: []
+    expected_unified: []
+
+  - id: single-milestone-list
+    query: "List the milestones for opportunity OPP-67890"
+    role: any
+    stage: any
+    category: single-shot
+    expected:
+      main: []
+      branch: []
+    expected_unified: []
+
+  - id: single-account-lookup
+    query: "Look up the account record for Contoso"
+    role: any
+    stage: any
+    category: single-shot
+    expected:
+      main: []
+      branch: []
+    expected_unified: []
+
+  - id: single-field-value
+    query: "What's the estimated revenue on this opportunity?"
+    role: any
+    stage: any
+    category: single-shot
+    expected:
+      main: []
+      branch: []
+    expected_unified: []
+
+  - id: single-task-status
+    query: "What's the status of task TASK-001?"
+    role: any
+    stage: any
+    category: single-shot
+    expected:
+      main: []
+      branch: []
+    expected_unified: []
+
+  # ── Mixed queries (skill + instruction should co-activate) ──────
+  # Tests the ideal lazy-loading behavior where both the relevant
+  # instruction AND skill fire together.
+
+  - id: mixed-stage-check
+    query: "What MCEM stage is this deal in and what exit criteria remain?"
+    role: Specialist
+    stage: any
+    category: mixed
+    expected:
+      main: [Specialist_SKILL.md]
+      branch:
+        - mcem-stage-identification-SKILL.md
+        - exit-criteria-validation-SKILL.md
+    expected_unified:
+      - mcem-stage-identification-SKILL.md
+      - exit-criteria-validation-SKILL.md
+      - mcem-flow.instructions.md
+
+  - id: mixed-crm-write-safety
+    query: "Update the milestone status to committed for this opportunity"
+    role: CSAM
+    stage: 3
+    category: mixed
+    expected:
+      main: [CSAM_SKILL.md]
+      branch: [commit-gate-enforcement-SKILL.md]
+    expected_unified:
+      - commit-gate-enforcement-SKILL.md
+      - msx-role-and-write-gate.instructions.md
+
+  - id: mixed-vault-risk
+    query: "Check vault notes and CRM signals for risks on Contoso"
+    role: any
+    stage: any
+    category: mixed
+    expected:
+      main: []
+      branch:
+        - risk-surfacing-SKILL.md
+        - vault-context-assembly-SKILL.md
+    expected_unified:
+      - risk-surfacing-SKILL.md
+      - vault-context-assembly-SKILL.md
+      - obsidian-vault.instructions.md
+
+  - id: mixed-role-pipeline
+    query: "As a Specialist, run pipeline hygiene and check for stale Stage 2 deals"
+    role: Specialist
+    stage: 2
+    category: mixed
+    expected:
+      main: [Specialist_SKILL.md]
+      branch: [pipeline-hygiene-triage-SKILL.md]
+    expected_unified:
+      - pipeline-hygiene-triage-SKILL.md
+      - role-card-specialist.instructions.md
+
+  # ── Budget stress tests ─────────────────────────────────────────
+  # Broad queries that could plausibly match many items.
+  # Measures how much unnecessary context each strategy loads.
+
+  - id: budget-broad-review
+    query: "Give me a full review of this account's health, risks, milestones, and adoption"
+    role: CSAM
+    stage: any
+    category: budget-stress
+    expected:
+      main: [CSAM_SKILL.md]
+      branch:
+        - milestone-health-review-SKILL.md
+        - risk-surfacing-SKILL.md
+        - adoption-excellence-review-SKILL.md
+    expected_unified:
+      - milestone-health-review-SKILL.md
+      - risk-surfacing-SKILL.md
+      - adoption-excellence-review-SKILL.md
+
+  - id: budget-everything
+    query: "Walk me through the entire MCEM process, all roles, all stages, all exit criteria"
+    role: any
+    stage: any
+    category: budget-stress
+    expected:
+      main: []
+      branch:
+        - mcem-stage-identification-SKILL.md
+        - exit-criteria-validation-SKILL.md
+    expected_unified:
+      - mcem-stage-identification-SKILL.md
+      - exit-criteria-validation-SKILL.md
+      - mcem-flow.instructions.md
+
+  - id: budget-vague
+    query: "Help me with this deal"
+    role: any
+    stage: any
+    category: budget-stress
+    expected:
+      main: []
+      branch: []
+    expected_unified: []
+
+  # ══════════════════════════════════════════════════════════════════
+  # TOOL INVOCATION EVAL — README scenario prompts → expected MCP tools
+  # ══════════════════════════════════════════════════════════════════
+  # Each case maps a natural-language prompt (from MSX or OIL README)
+  # to the MCP tool(s) an agent should invoke. Format: "server:tool_name".
+  # Evaluated by score-tool-routing.mjs against tool-catalog.yaml.
+
+  # ── MSX: Identity & Auth ────────────────────────────────────────
+  - id: tool-msx-whoami
+    query: "Who am I in CRM?"
+    category: tool-invocation
+    expected_tools:
+      - msx:crm_whoami
+
+  - id: tool-msx-auth-status
+    query: "Check my CRM authentication status."
+    category: tool-invocation
+    expected_tools:
+      - msx:crm_auth_status
+
+  - id: tool-msx-check-connection
+    query: "Check my CRM connection"
+    category: tool-invocation
+    expected_tools:
+      - msx:crm_whoami
+      - msx:crm_auth_status
+
+  # ── MSX: Discovery & Exploration ────────────────────────────────
+  - id: tool-msx-my-opps
+    query: "List my active opportunities."
+    category: tool-invocation
+    expected_tools:
+      - msx:get_my_active_opportunities
+    expected_skills:
+      - pipeline-hygiene-triage-SKILL.md
+
+  - id: tool-msx-opps-by-customer
+    query: "Show opportunities for customer Contoso."
+    category: tool-invocation
+    expected_tools:
+      - msx:list_opportunities
+
+  - id: tool-msx-what-opps-own
+    query: "What opportunities do I own?"
+    category: tool-invocation
+    expected_tools:
+      - msx:get_my_active_opportunities
+
+  - id: tool-msx-accounts-tpid
+    query: "Find accounts by TPID 12345."
+    category: tool-invocation
+    expected_tools:
+      - msx:list_accounts_by_tpid
+
+  - id: tool-msx-task-status-codes
+    query: "What are the valid task status codes?"
+    category: tool-invocation
+    expected_tools:
+      - msx:get_task_status_options
+
+  # ── MSX: Milestone Workflows ────────────────────────────────────
+  - id: tool-msx-milestones-by-opp
+    query: "Show all milestones for this opportunity."
+    category: tool-invocation
+    expected_tools:
+      - msx:get_milestones
+
+  - id: tool-msx-milestones-keyword
+    query: "Show my active milestones with keyword Azure."
+    category: tool-invocation
+    expected_tools:
+      - msx:get_milestones
+
+  - id: tool-msx-milestones-no-tasks
+    query: "Which milestones for Contoso are missing tasks?"
+    category: tool-invocation
+    expected_tools:
+      - msx:find_milestones_needing_tasks
+    expected_skills:
+      - milestone-health-review-SKILL.md
+      - task-hygiene-flow-SKILL.md
+
+  - id: tool-msx-milestone-timeline
+    query: "Show me a timeline of my milestones this quarter."
+    category: tool-invocation
+    expected_tools:
+      - msx:view_milestone_timeline
+    expected_skills:
+      - milestone-health-review-SKILL.md
+
+  - id: tool-msx-milestone-activities
+    query: "Show the tasks linked to this milestone."
+    category: tool-invocation
+    expected_tools:
+      - msx:get_milestone_activities
+
+  # ── MSX: Task Workflows ─────────────────────────────────────────
+  - id: tool-msx-create-task
+    query: "Create a task Architecture Design Session on this milestone."
+    category: tool-invocation
+    expected_tools:
+      - msx:create_task
+    expected_skills:
+      - task-hygiene-flow-SKILL.md
+
+  - id: tool-msx-update-task
+    query: "Update the task due date to 2026-04-30."
+    category: tool-invocation
+    expected_tools:
+      - msx:update_task
+
+  - id: tool-msx-close-task
+    query: "Close this task as completed."
+    category: tool-invocation
+    expected_tools:
+      - msx:close_task
+    expected_skills:
+      - task-hygiene-flow-SKILL.md
+
+  # ── MSX: Milestone Updates ──────────────────────────────────────
+  - id: tool-msx-update-milestone
+    query: "Update milestone 7-503362186 date to 2026-04-15."
+    category: tool-invocation
+    expected_tools:
+      - msx:update_milestone
+
+  # ── MSX: Approval Queue ─────────────────────────────────────────
+  - id: tool-msx-list-pending
+    query: "Show pending operations."
+    category: tool-invocation
+    expected_tools:
+      - msx:list_pending_operations
+
+  - id: tool-msx-execute-one
+    query: "Execute OP-1."
+    category: tool-invocation
+    expected_tools:
+      - msx:execute_operation
+
+  - id: tool-msx-execute-all
+    query: "Execute all pending operations."
+    category: tool-invocation
+    expected_tools:
+      - msx:execute_all
+
+  - id: tool-msx-cancel-one
+    query: "Cancel OP-2."
+    category: tool-invocation
+    expected_tools:
+      - msx:cancel_operation
+
+  - id: tool-msx-cancel-all
+    query: "Cancel all pending operations."
+    category: tool-invocation
+    expected_tools:
+      - msx:cancel_all
+
+  # ── MSX: Visualization ──────────────────────────────────────────
+  - id: tool-msx-cost-trend
+    query: "Show cost trend for this opportunity."
+    category: tool-invocation
+    expected_tools:
+      - msx:view_opportunity_cost_trend
+
+  - id: tool-msx-staged-diff
+    query: "Show a diff of the staged changes."
+    category: tool-invocation
+    expected_tools:
+      - msx:view_staged_changes_diff
+
+  # ── MSX: OData Direct ───────────────────────────────────────────
+  - id: tool-msx-crm-query
+    query: "Run an OData query against the accounts entity set."
+    category: tool-invocation
+    expected_tools:
+      - msx:crm_query
+
+  - id: tool-msx-get-record
+    query: "Get the CRM record for this GUID."
+    category: tool-invocation
+    expected_tools:
+      - msx:crm_get_record
+
+  # ── OIL: Orient ─────────────────────────────────────────────────
+  - id: tool-oil-vault-context
+    query: "Give me an overview of my vault."
+    category: tool-invocation
+    expected_tools:
+      - oil:get_vault_context
+
+  - id: tool-oil-customer-context
+    query: "What's the context for Contoso?"
+    category: tool-invocation
+    expected_tools:
+      - oil:get_customer_context
+    expected_skills:
+      - vault-context-assembly-SKILL.md
+
+  - id: tool-oil-person-context
+    query: "Look up the person Alice Smith in the vault."
+    category: tool-invocation
+    expected_tools:
+      - oil:get_person_context
+
+  - id: tool-oil-graph-query
+    query: "Show backlinks and related notes for this file."
+    category: tool-invocation
+    expected_tools:
+      - oil:query_graph
+
+  - id: tool-oil-resolve-people
+    query: "Match these meeting attendees to customers in the vault."
+    category: tool-invocation
+    expected_tools:
+      - oil:resolve_people_to_customers
+
+  - id: tool-oil-opp-context
+    query: "What opportunities does Contoso have in the vault?"
+    category: tool-invocation
+    expected_tools:
+      - oil:get_opportunity_context
+
+  - id: tool-oil-milestone-context
+    query: "Show milestones for Contoso from vault notes."
+    category: tool-invocation
+    expected_tools:
+      - oil:get_milestone_context
+
+  # ── OIL: Retrieve ───────────────────────────────────────────────
+  - id: tool-oil-search
+    query: "Search my notes for Azure migration."
+    category: tool-invocation
+    expected_tools:
+      - oil:search_vault
+
+  - id: tool-oil-query-notes
+    query: "Find all notes tagged at-risk in the vault."
+    category: tool-invocation
+    expected_tools:
+      - oil:query_notes
+
+  - id: tool-oil-similar
+    query: "Find notes similar to the Contoso customer file."
+    category: tool-invocation
+    expected_tools:
+      - oil:find_similar_notes
+
+  # ── OIL: Write ──────────────────────────────────────────────────
+  - id: tool-oil-patch-note
+    query: "Add an insight to Contoso's Agent Insights section."
+    category: tool-invocation
+    expected_tools:
+      - oil:patch_note
+
+  - id: tool-oil-connect-hook
+    query: "Capture Connect evidence from the customer meeting."
+    category: tool-invocation
+    expected_tools:
+      - oil:capture_connect_hook
+    expected_skills:
+      - customer-evidence-pack-SKILL.md
+
+  - id: tool-oil-meeting-note
+    query: "Draft a meeting note for the Contoso kickoff."
+    category: tool-invocation
+    expected_tools:
+      - oil:draft_meeting_note
+
+  - id: tool-oil-update-customer
+    query: "Update the Contoso customer file with new team info."
+    category: tool-invocation
+    expected_tools:
+      - oil:update_customer_file
+
+  - id: tool-oil-create-customer
+    query: "Onboard new customer Fabrikam in the vault."
+    category: tool-invocation
+    expected_tools:
+      - oil:create_customer_file
+
+  - id: tool-oil-apply-tags
+    query: "Tag all Contoso-related notes with priority-high."
+    category: tool-invocation
+    expected_tools:
+      - oil:apply_tags
+
+  # ── OIL: Composite ──────────────────────────────────────────────
+  - id: tool-oil-crm-prefetch
+    query: "Get the CRM identifiers for Contoso from my vault."
+    category: tool-invocation
+    expected_tools:
+      - oil:prepare_crm_prefetch
+    expected_skills:
+      - vault-context-assembly-SKILL.md
+
+  - id: tool-oil-correlate
+    query: "Cross-reference meeting attendees with vault notes."
+    category: tool-invocation
+    expected_tools:
+      - oil:correlate_with_vault
+
+  - id: tool-oil-vault-health
+    query: "Check my vault health for stale data and missing IDs."
+    category: tool-invocation
+    expected_tools:
+      - oil:check_vault_health
+    expected_skills:
+      - pipeline-hygiene-triage-SKILL.md
+
+  - id: tool-oil-drift
+    query: "Compare vault data to CRM state for Contoso."
+    category: tool-invocation
+    expected_tools:
+      - oil:get_drift_report
+    expected_skills:
+      - risk-surfacing-SKILL.md
+
+  - id: tool-oil-promote
+    query: "Promote validated findings from the meeting to customer files."
+    category: tool-invocation
+    expected_tools:
+      - oil:promote_findings
+
+  # ── Cross-MCP workflows ─────────────────────────────────────────
+  - id: tool-cross-vault-then-crm
+    query: "Get Contoso's context from vault then list their CRM opportunities."
+    category: tool-invocation
+    expected_tools:
+      - oil:get_customer_context
+      - msx:list_opportunities
+    expected_skills:
+      - vault-context-assembly-SKILL.md
+      - pipeline-qualification-SKILL.md
+
+  - id: tool-cross-prefetch-query
+    query: "Pull Contoso's IDs from vault and query their milestones in CRM."
+    category: tool-invocation
+    expected_tools:
+      - oil:prepare_crm_prefetch
+      - msx:get_milestones
+    expected_skills:
+      - vault-context-assembly-SKILL.md
+      - milestone-health-review-SKILL.md
+
+  - id: tool-cross-m365-correlate
+    query: "Search Teams for recent Contoso messages and match people to vault."
+    category: tool-invocation
+    expected_tools:
+      - workiq:ask_work_iq
+      - oil:correlate_with_vault
+
+  - id: tool-cross-drift-update
+    query: "Check vault drift for Contoso and update stale milestones in CRM."
+    category: tool-invocation
+    expected_tools:
+      - oil:get_drift_report
+      - msx:update_milestone
+    expected_skills:
+      - risk-surfacing-SKILL.md
+      - milestone-health-review-SKILL.md
+
+  # ── Negative (no tool expected) ─────────────────────────────────
+  - id: tool-neg-weather
+    query: "What's the weather in Seattle today?"
+    category: tool-invocation
+    expected_tools: []
+
+  - id: tool-neg-joke
+    query: "Tell me a joke about databases."
+    category: tool-invocation
+    expected_tools: []
+
+  - id: tool-neg-recipe
+    query: "How do I make pasta carbonara?"
+    category: tool-invocation
+    expected_tools: []
