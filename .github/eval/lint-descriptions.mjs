@@ -27,7 +27,7 @@ const LEGACY_DIR = join(SKILLS_DIR, '_legacy');
 const lintAll = process.argv.includes('--all');
 
 function shortName(file) {
-  return file.replace(/[-_]SKILL\.md$/, '');
+  return file.replace(/\/SKILL\.md$/, '').replace(/[-_]SKILL\.md$/, '');
 }
 
 /** Tokenize into lowercase words (strip punctuation). */

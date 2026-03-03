@@ -50,7 +50,7 @@ Cache probe results for the session. Two-medium answers are acceptable; single-m
 - For write-intent flows → `.github/instructions/msx-role-and-write-gate.instructions.md`
 - **Deal team**: Not retrievable via MCP tools. See `crm-entity-schema.instructions.md` § "Deal Team".
 
-**WorkIQ**: Narrow scope before retrieval. See `.github/skills/workiq-query-scoping-SKILL.md`. Resolve role first, then apply scoping.
+**WorkIQ**: Narrow scope before retrieval. See `.github/skills/workiq-query-scoping/SKILL.md`. Resolve role first, then apply scoping.
 
 **Vault (OIL)**: Knowledge store for customer context and durable memory. See `.github/instructions/obsidian-vault.instructions.md`. If unavailable, operate statelessly (CRM-only).
 
@@ -67,7 +67,9 @@ Cache probe results for the session. Two-medium answers are acceptable; single-m
 |---|---|---|---|
 | **0** | This file | Always (every turn) | ≤100 lines |
 | **1** | `.github/instructions/*.instructions.md` | By `description` match or `applyTo` glob | ≤600 lines combined |
-| **2** | `.github/skills/*_SKILL.md` | By `name`/`description`/`argument-hint` match | ≤500 lines per skill |
+| **2** | `.github/skills/{name}/SKILL.md` | Auto-discovered by VS Code via frontmatter | ≤500 lines per skill |
 | **3** | `.github/documents/` | Explicit tool read only | No auto-load |
 
-**Authoring rules**: Every instruction needs keyword-rich `description` frontmatter. Every skill needs `name`, `description`, `argument-hint`. Shared definitions belong in Tier 1, not duplicated across skills.
+**Skill loading**: Skills use the folder convention `.github/skills/{name}/SKILL.md` and are auto-discovered by VS Code via `name`, `description`, and `argument-hint` frontmatter. When a role card or MCEM flow references a skill by name, load it with `read_file` at `.github/skills/{name}/SKILL.md`.
+
+**Authoring rules**: Every instruction needs keyword-rich `description` frontmatter. Every skill needs `name`, `description`, `argument-hint` in its `SKILL.md` frontmatter. Shared definitions belong in Tier 1, not duplicated across skills.

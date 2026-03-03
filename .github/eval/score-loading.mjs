@@ -134,6 +134,7 @@ function computeMetrics(ranked, expected) {
 
 function shortName(file) {
   return file
+    .replace(/\/SKILL\.md$/, '')
     .replace(/[-_]SKILL\.md$/, '')
     .replace(/\.instructions\.md$/, '');
 }

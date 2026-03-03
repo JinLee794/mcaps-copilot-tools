@@ -374,7 +374,7 @@ GitHub Copilot looks for special files in your repo's `.github/` folder and load
 |---|---|
 | `.github/copilot-instructions.md` | **Always loaded.** The "system prompt" — top-level rules Copilot follows on every turn. |
 | `.github/instructions/*.instructions.md` | **Loaded when relevant.** Each file has a `description` in its YAML frontmatter. Copilot loads it when your request matches those keywords. |
-| `.github/skills/*_SKILL.md` | **Loaded on demand.** Deep role/domain playbooks. Copilot picks the right one based on `name` and `description` in frontmatter. |
+| `.github/skills/*/SKILL.md` | **Loaded on demand.** Deep role/domain playbooks. Copilot picks the right one based on `name` and `description` in frontmatter. |
 | `.github/prompts/*.prompt.md` | **Reusable prompt templates.** Appear in Copilot's slash-command menu (`/`) so you can trigger complex workflows with one click. |
 
 You don't need to register these files anywhere — just create or edit them and Copilot picks them up automatically.
@@ -400,14 +400,14 @@ Here's what ships out of the box and what each piece does:
 │   ├── connect-hooks.instructions.md         ← Evidence capture for Connect impact reporting
 │   └── obsidian-vault.instructions.md        ← Vault integration conventions
 ├── skills/                          ← 27 atomic domain skills (loaded on demand)
-│   ├── pipeline-qualification-SKILL.md       ← Qualify new opportunities (Stages 1-2)
-│   ├── milestone-health-review-SKILL.md      ← Committed milestone health (Stages 4-5)
-│   ├── proof-plan-orchestration-SKILL.md     ← Technical proof management
-│   ├── risk-surfacing-SKILL.md               ← Proactive risk identification
-│   ├── handoff-readiness-validation-SKILL.md ← Cross-role handoff quality
-│   ├── mcem-stage-identification-SKILL.md    ← Identify current MCEM stage
-│   ├── workiq-query-scoping-SKILL.md         ← Scope M365 searches effectively
-│   ├── skill-authoring-best-practices-SKILL.md ← Guide for writing your own skills
+│   ├── pipeline-qualification/SKILL.md       ← Qualify new opportunities (Stages 1-2)
+│   ├── milestone-health-review/SKILL.md      ← Committed milestone health (Stages 4-5)
+│   ├── proof-plan-orchestration/SKILL.md     ← Technical proof management
+│   ├── risk-surfacing/SKILL.md               ← Proactive risk identification
+│   ├── handoff-readiness-validation/SKILL.md ← Cross-role handoff quality
+│   ├── mcem-stage-identification/SKILL.md    ← Identify current MCEM stage
+│   ├── workiq-query-scoping/SKILL.md         ← Scope M365 searches effectively
+│   ├── skill-authoring-best-practices/SKILL.md ← Guide for writing your own skills
 │   ├── ... (19 more atomic skills)           ← See directory for full list
 │   └── _legacy/                              ← Archived monolithic role skills (reference only)
 ├── prompts/
@@ -480,7 +480,7 @@ description: "Specialist (STU) role identity card. Mission, MCEM stage accountab
 ---
 ```
 
-**Tip:** You can duplicate a skill and create a variation for a sub-team (e.g., a `milestone-health-review-fasttrack-SKILL.md` with FastTrack-specific patterns).
+**Tip:** You can duplicate a skill and create a variation for a sub-team (e.g., a `milestone-health-review-fasttrack/SKILL.md` with FastTrack-specific patterns).
 
 #### 4. Create reusable prompt templates
 
@@ -550,7 +550,7 @@ Understanding the loading tiers helps you decide where to put new content:
 |---|---|---|---|
 | **Tier 0** | `copilot-instructions.md` | Every single turn | Global rules, routing, response style (~80 lines max) |
 | **Tier 1** | `instructions/*.instructions.md` | When request matches `description` keywords | Operational contracts, workflow gates, schemas |
-| **Tier 2** | `skills/*_SKILL.md` | When request matches `name`/`description` | Deep role playbooks, domain expertise |
+| **Tier 2** | `skills/*/SKILL.md` | When request matches `name`/`description` | Deep role playbooks, domain expertise |
 | **Tier 3** | `documents/` | Only when explicitly read via tool call | Large reference material, specs, protocol docs |
 
 **Rule of thumb:** Put universals in Tier 0, conditionals in Tier 1, role-specific depth in Tier 2, and bulky references in Tier 3.
@@ -572,7 +572,7 @@ Everything works fine without it. Obsidian integration is entirely optional.
 The MCP servers can work with any MCP-compatible client, but VS Code with GitHub Copilot is the recommended and best-supported experience.
 
 **How do I write a good skill or instruction file?**
-See [skill-authoring-best-practices-SKILL.md](.github/skills/skill-authoring-best-practices-SKILL.md) for a full checklist. The short version: keep the `description` keyword-rich so Copilot finds it, structure the body as a step-by-step workflow, and don't exceed ~150 lines per file.
+See [skill-authoring-best-practices/SKILL.md](.github/skills/skill-authoring-best-practices/SKILL.md) for a full checklist. The short version: keep the `description` keyword-rich so Copilot finds it, structure the body as a step-by-step workflow, and don't exceed ~150 lines per file.
 
 **I edited a file in `.github/` but Copilot doesn't seem to use it.**
 Check the `description` field in the YAML frontmatter — Copilot matches against those keywords. If the description doesn't overlap with how you phrase your request, it won't load. Try adding more trigger phrases to the description.

@@ -68,6 +68,7 @@ function info(ctx, msg) { ISSUES.info.push({ ctx, msg }); }
 
 function shortName(file) {
   return file
+    .replace(/\/SKILL\.md$/, '')
     .replace(/[-_]SKILL\.md$/, '')
     .replace(/\.instructions\.md$/, '');
 }

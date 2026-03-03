@@ -9,22 +9,22 @@
 			],
 			"type": "stdio"
 		},
-		"msx-crm": {
-			"type": "stdio",
-			"command": "node",
-			"args": [
-				"mcp/msx/src/index.js"
-			],
-			"env": {
-				"MSX_CRM_URL": "https://microsoftsales.crm.dynamics.com",
-				"MSX_TENANT_ID": "72f988bf-86f1-41af-91ab-2d7cd011db47"
-			}
-		},
+		// "msx-crm": {
+		// 	"type": "stdio",
+		// 	"command": "node",
+		// 	"args": [
+		// 		"mcp/msx/src/index.js"
+		// 	],
+		// 	"env": {
+		// 		"MSX_CRM_URL": "https://microsoftsales.crm.dynamics.com",
+		// 		"MSX_TENANT_ID": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+		// 	}
+		// },
 
-		// Obsidian Intelligence Layer (OIL) — knowledge layer MCP server
-		// Subtree: mcp/oil (https://github.com/JinLee794/Obsidian-Intelligence-Layer)
-		// Setup: cd mcp/oil && npm install && npm run build
-		// If not configured, workflows fall back to stateless CRM-only operation.
+		// // Obsidian Intelligence Layer (OIL) — knowledge layer MCP server
+		// // Subtree: mcp/oil (https://github.com/JinLee794/Obsidian-Intelligence-Layer)
+		// // Setup: cd mcp/oil && npm install && npm run build
+		// // If not configured, workflows fall back to stateless CRM-only operation.
 		// "oil": {
 		// 	"type": "stdio",
 		// 	"command": "node",

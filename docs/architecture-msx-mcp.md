@@ -19,7 +19,7 @@ flowchart TB
   subgraph "Context Loading (workspace-local)"
     CI[".github/copilot-instructions.md\nTier 0 — always loaded"]
     RC["instructions/role-card-*.instructions.md\nTier 1 — by keyword match"]
-    SK["skills/*-SKILL.md\nTier 2 — on demand"]
+    SK["skills/*/SKILL.md\nTier 2 — on demand"]
   end
 
   Agent --> CI
@@ -104,7 +104,7 @@ flowchart LR
 ## Role-Skill Binding + Context Stack Transparency
 
 - Role identity is resolved by matching the user's self-identified role to a **role card** under `.github/instructions/role-card-*.instructions.md`.
-- Once the role is resolved, Copilot activates relevant **atomic skills** from `.github/skills/*-SKILL.md` based on keyword matching against the request.
+- Once the role is resolved, Copilot activates relevant **atomic skills** from `.github/skills/*/SKILL.md` based on keyword matching against the request.
 - The original monolithic role skills (e.g., `Solution_Engineer_SKILL.md`) are archived in `.github/skills/_legacy/` — see the [legacy README](../.github/skills/_legacy/README.md) for the decomposition mapping.
 - Execution context should explicitly include the resolved role card and active skills alongside user prompt and repo instructions.
 - UI should expose a collapsible Context Stack panel showing:

@@ -36,7 +36,7 @@ The current customization layer (~4,500 lines across 12 files) has three structu
 
 ## Governing Principles (from Skill Authoring Best Practices)
 
-All new and refactored files MUST conform to `Skill_Authoring_Best_Practices_SKILL.md`. The following principles are binding constraints on the restructure.
+All new and refactored files MUST conform to `skill-authoring-best-practices/SKILL.md`. The following principles are binding constraints on the restructure.
 
 ### P1. Description-Driven Routing
 
@@ -151,8 +151,8 @@ Tier 1  instructions/                                      [THE MAP]
 
 Tier 2  skills/                                            [THE TOOLS]
         ├── (atomic skill files — see catalog below)
-        ├── Skill_Authoring_Best_Practices_SKILL.md  (existing, keep)
-        └── WorkIQ_Query_Scoping_SKILL.md             (existing, keep)
+        ├── skill-authoring-best-practices/SKILL.md  (existing, keep)
+        └── workiq-query-scoping/SKILL.md              (existing, keep)
 
 Tier 3  documents/                                         [THE LIBRARY]
         ├── MCEM-stage-reference.md         ★ NEW — authoritative MCEM stage definitions, exit criteria, role accountability
@@ -375,7 +375,7 @@ This ensures **the CSU lens is always applied at Stages 4–5** and **the STU le
 
 Extract the ~40 procedural "agent skill" flows currently embedded across four role SKILL.md files into individual skill files. Each is 30–80 lines.
 
-**Naming convention**: `kebab-case-SKILL.md`, lowercase + hyphens only, gerund or noun form preferred, ≤64 chars (per P5)
+**Naming convention**: `kebab-case/SKILL.md` (folder convention), lowercase + hyphens only, gerund or noun form preferred, ≤64 chars (per P5)
 
 **Frontmatter template** (conforming to P1 + P5):
 ```yaml
@@ -668,7 +668,7 @@ Note: The 5 process navigation skills are net-new capabilities that don't exist 
 - [x] **P1**: Every skill `description` is third person, ≤1024 chars, includes role names + MCEM stage + user trigger phrases
 - [x] **P2**: No skill body exceeds 500 lines; atomic skills target 30–80 (49–60 actual)
 - [x] **P3**: No reference chain deeper than one level from any SKILL.md
-- [x] **P4**: Each skill declares its freedom level; write-intent = low freedom with exact confirmation gate (note: pre-existing `WorkIQ_Query_Scoping_SKILL.md` lacks freedom level — deferred)
+- [x] **P4**: Each skill declares its freedom level; write-intent = low freedom with exact confirmation gate (note: pre-existing `workiq-query-scoping/SKILL.md` lacks freedom level — deferred)
 - [x] **P5**: All `name` fields are ≤64 chars, lowercase+hyphens, gerund/noun form; MCP tools use `ServerName:tool_name` (note: pre-existing files use underscores — deferred)
 - [x] **P6**: Terminology is consistent across all files (Opportunity, Milestone, Committed/Uncommitted, Stage 1–5)
 - [x] **P7**: Multi-step workflows have numbered steps; critical workflows have copyable checklists

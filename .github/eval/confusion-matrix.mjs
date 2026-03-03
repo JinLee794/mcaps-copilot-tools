@@ -30,7 +30,7 @@ for (let i = 0; i < args.length; i++) {
 }
 
 function shortName(file) {
-  return file.replace(/[-_]SKILL\.md$/, '');
+  return file.replace(/\/SKILL\.md$/, '').replace(/[-_]SKILL\.md$/, '');
 }
 
 const heatChar = sim => {

@@ -22,11 +22,11 @@ export function parseFrontmatter(content) {
  *   { file, name, description, argumentHint, lines, searchText }
  *
  * Supports both conventions:
- *   - Folder: <name>/SKILL.md  (auto-discoverable by VS Code)
+ *   - Folder: <name>/SKILL.md  (auto-discoverable by VS Code, primary)
  *   - Flat:   <name>-SKILL.md  (legacy, fallback)
  *
- * Internal `file` identifier is normalized to `<name>-SKILL.md` for
- * backward compatibility with eval test-case identifiers.
+ * Internal `file` identifier uses `<name>/SKILL.md` for folder-based skills
+ * and `<name>-SKILL.md` for legacy flat files.
  */
 export function loadSkills(dir) {
   const entries = readdirSync(dir, { withFileTypes: true });
@@ -38,7 +38,7 @@ export function loadSkills(dir) {
     if (!e.isDirectory() || e.name.startsWith('_')) continue;
     const skillPath = join(dir, e.name, 'SKILL.md');
     if (!existsSync(skillPath)) continue;
-    const canonName = `${e.name}-SKILL.md`;
+    const canonName = `${e.name}/SKILL.md`;
     seen.add(canonName);
     const content = readFileSync(skillPath, 'utf-8');
     const fm = parseFrontmatter(content);
@@ -59,7 +59,9 @@ export function loadSkills(dir) {
   // Flat convention (legacy fallback): <name>-SKILL.md
   for (const e of entries) {
     if (!e.isFile() || !(e.name.endsWith('-SKILL.md') || e.name.endsWith('_SKILL.md'))) continue;
-    if (seen.has(e.name)) continue;
+    // Skip if folder version already loaded
+    const baseName = e.name.replace(/[-_]SKILL\.md$/, '');
+    if (seen.has(`${baseName}/SKILL.md`)) continue;
     const content = readFileSync(join(dir, e.name), 'utf-8');
     const fm = parseFrontmatter(content);
     const lines = content.split('\n').length;
@@ -183,8 +185,10 @@ export function loadSkillsFromRef(ref, skillsPath) {
 
     // Flat: *-SKILL.md or *_SKILL.md directly in skillsPath
     if (basename.endsWith('-SKILL.md') || basename.endsWith('_SKILL.md')) {
+      // Skip if folder version already loaded
+      const base = basename.replace(/[-_]SKILL\.md$/, '');
       const content = gitShow(ref, filePath);
-      if (!content || seen.has(basename)) continue;
+      if (!content || seen.has(basename) || seen.has(`${base}/SKILL.md`)) continue;
       seen.add(basename);
       const fm = parseFrontmatter(content);
       const lines = content.split('\n').length;
@@ -205,7 +209,7 @@ export function loadSkillsFromRef(ref, skillsPath) {
     if (basename === 'SKILL.md') {
       const parts = filePath.split('/');
       const dirName = parts[parts.length - 2];
-      const canonName = `${dirName}-SKILL.md`;
+      const canonName = `${dirName}/SKILL.md`;
       if (seen.has(canonName)) continue;
       seen.add(canonName);
       const content = gitShow(ref, filePath);

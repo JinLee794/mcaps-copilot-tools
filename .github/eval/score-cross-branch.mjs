@@ -105,6 +105,7 @@ function fmtSim(v) { return v.toFixed(3); }
 function fmtPct(v) { return v.toFixed(2); }
 function shortName(file) {
   return file
+    .replace(/\/SKILL\.md$/, '')
     .replace(/[-_]SKILL\.md$/, '')
     .replace(/\.instructions\.md$/, '');
 }

@@ -26,7 +26,7 @@ const SKILLS_DIR = join(__dirname, '..', 'skills');
 const crossCheck = process.argv.includes('--cross');
 
 function shortName(file) {
-  return file.replace(/\.instructions\.md$/, '').replace(/[-_]SKILL\.md$/, '');
+  return file.replace(/\.instructions\.md$/, '').replace(/\/SKILL\.md$/, '').replace(/[-_]SKILL\.md$/, '');
 }
 
 function tokenize(text) {

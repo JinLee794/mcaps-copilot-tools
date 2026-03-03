@@ -45,7 +45,7 @@ Collect scope in minimal calls before per-milestone workflows:
 Use `ask_work_iq` when evidence lives in M365 rather than CRM:
 - **Sources**: Teams chats/channels, meeting transcripts/notes, Outlook mail/calendar, SharePoint/OneDrive docs.
 - **Source separation**: CRM = system-of-record status; WorkIQ = communication and delivery evidence.
-- **Scoping**: Always include explicit date range, customer/people, and source types. See `workiq-query-scoping-SKILL.md` for full playbook.
+- **Scoping**: Always include explicit date range, customer/people, and source types. See `workiq-query-scoping/SKILL.md` for full playbook.
 
 ## VAULT-PROMOTE (Post-Workflow)
 
