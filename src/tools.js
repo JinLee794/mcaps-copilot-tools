@@ -68,22 +68,31 @@ function daysAgo(days) {
 
 const ACTIVE_STATUSES = new Set(['Not Started', 'In Progress', 'Blocked', 'At Risk']);
 
+/** Derive human-readable commitment label from a milestone record. */
+function commitmentLabel(m) {
+  return m.msp_commitmentrecommendation === 861980001 ? 'Committed' : 'Uncommitted';
+}
+
 function buildMilestoneSummary(milestones) {
   const byStatus = {};
   const byOpportunity = {};
+  const byCommitment = { Committed: 0, Uncommitted: 0 };
   for (const m of milestones) {
     const status = fv(m, 'msp_milestonestatus') || 'Unknown';
     byStatus[status] = (byStatus[status] || 0) + 1;
     const opp = fv(m, '_msp_opportunityid_value') || 'Unknown';
     byOpportunity[opp] = (byOpportunity[opp] || 0) + 1;
+    byCommitment[commitmentLabel(m)] += 1;
   }
   return {
     count: milestones.length,
     byStatus,
+    byCommitment,
     byOpportunity,
     milestones: milestones.map(m => ({
       ...m,
       status: fv(m, 'msp_milestonestatus'),
+      commitment: commitmentLabel(m),
       opportunity: fv(m, '_msp_opportunityid_value')
     }))
   };
@@ -248,7 +257,7 @@ export function registerTools(server, crmClient) {
           query: { $select: MILESTONE_SELECT }
         });
         if (!result.ok) return error(`Milestone lookup failed (${result.status}): ${result.data?.message}`);
-        return text(result.data);
+        return text({ ...result.data, commitment: commitmentLabel(result.data) });
       }
 
       let filter;
@@ -284,7 +293,7 @@ export function registerTools(server, crmClient) {
           milestones = await applyTaskFilter(crmClient, milestones, taskFilterParam);
         }
         if (format === 'summary') return text(buildMilestoneSummary(milestones));
-        return text({ count: milestones.length, milestones });
+        return text({ count: milestones.length, milestones: milestones.map(m => ({ ...m, commitment: commitmentLabel(m) })) });
       } else if (opportunityId) {
         const nid = normalizeGuid(opportunityId);
         if (!isValidGuid(nid)) return error('Invalid opportunityId GUID');
@@ -326,7 +335,7 @@ export function registerTools(server, crmClient) {
         milestones = await applyTaskFilter(crmClient, milestones, taskFilterParam);
       }
       if (format === 'summary') return text(buildMilestoneSummary(milestones));
-      return text({ count: milestones.length, milestones });
+      return text({ count: milestones.length, milestones: milestones.map(m => ({ ...m, commitment: commitmentLabel(m) })) });
     }
   );
 
@@ -564,10 +573,78 @@ export function registerTools(server, crmClient) {
       if (forecastComments !== undefined) payload.msp_forecastcomments = forecastComments;
       if (Object.keys(payload).length === 0) return error('No fields to update');
 
-      // Fetch before-state for diff preview
-      const before = await crmClient.request(`msp_engagementmilestones(${nid})`, {
-        query: { $select: Object.keys(payload).join(',') }
+      // Fetch full milestone record for identity verification + before-state
+      const fullRecord = await crmClient.request(`msp_engagementmilestones(${nid})`, {
+        query: { $select: MILESTONE_SELECT }
       });
+      if (!fullRecord.ok) {
+        return error(`Milestone ${nid} not found or inaccessible (${fullRecord.status}): ${fullRecord.data?.message || 'lookup failed'}`);
+      }
+
+      const record = fullRecord.data;
+      const milestoneNumber = record.msp_milestonenumber || null;
+      const milestoneName = record.msp_name || null;
+      const milestoneOppId = record._msp_opportunityid_value || null;
+      const milestoneOwnerId = record._ownerid_value || null;
+      const opportunityName = fv(record, '_msp_opportunityid_value') || null;
+
+      // Ownership verification: ensure current user owns milestone or is on deal team
+      const whoAmI = await crmClient.request('WhoAmI');
+      if (whoAmI.ok && whoAmI.data?.UserId) {
+        const currentUserId = normalizeGuid(whoAmI.data.UserId);
+        const isOwner = milestoneOwnerId && normalizeGuid(milestoneOwnerId) === currentUserId;
+
+        if (!isOwner && milestoneOppId) {
+          // Check if user owns the opportunity or any milestones under it
+          const oppResult = await crmClient.request(`opportunities(${normalizeGuid(milestoneOppId)})`, {
+            query: { $select: '_ownerid_value' }
+          });
+          const oppOwnerId = oppResult.ok ? normalizeGuid(oppResult.data?._ownerid_value || '') : '';
+          const isOppOwner = oppOwnerId === currentUserId;
+
+          if (!isOppOwner) {
+            const teamCheck = await crmClient.requestAllPages('msp_engagementmilestones', {
+              query: {
+                $filter: `_msp_opportunityid_value eq '${normalizeGuid(milestoneOppId)}' and _ownerid_value eq '${currentUserId}'`,
+                $select: 'msp_engagementmilestoneid',
+                $top: '1'
+              }
+            });
+            const isOnDealTeam = teamCheck.ok && teamCheck.data?.value?.length > 0;
+            if (!isOnDealTeam) {
+              return error(
+                `Ownership check failed: milestone ${milestoneNumber || nid} ("${milestoneName || 'unknown'}") ` +
+                `under opportunity "${opportunityName || milestoneOppId}" is not owned by you and you are not on the deal team. ` +
+                `Verify you have the correct milestone ID.`
+              );
+            }
+          }
+        } else if (!isOwner && !milestoneOppId) {
+          return error(
+            `Ownership check failed: milestone ${milestoneNumber || nid} is not owned by you ` +
+            `and has no linked opportunity for deal-team verification.`
+          );
+        }
+      }
+
+      // Build before-state limited to fields being changed
+      const before = {};
+      for (const key of Object.keys(payload)) {
+        before[key] = record[key] ?? null;
+      }
+
+      // Identity metadata for pre-execution verification
+      const identity = {
+        milestoneNumber,
+        milestoneName,
+        opportunityId: milestoneOppId,
+        opportunityName,
+      };
+
+      const humanDesc = `Update milestone ${milestoneNumber || nid}` +
+        (milestoneName ? ` ("${milestoneName}")` : '') +
+        (opportunityName ? ` on "${opportunityName}"` : '') +
+        `: ${Object.keys(payload).join(', ')}`;
 
       const queue = getApprovalQueue();
       const op = queue.stage({
@@ -575,14 +652,18 @@ export function registerTools(server, crmClient) {
         entitySet: `msp_engagementmilestones(${nid})`,
         method: 'PATCH',
         payload,
-        beforeState: before.ok ? before.data : null,
-        description: `Update milestone ${nid}: ${Object.keys(payload).join(', ')}`
+        beforeState: before,
+        description: humanDesc
       });
+      // Attach identity for execution-time re-verification
+      op.identity = identity;
+
       return text({
         staged: true,
         operationId: op.id,
         description: op.description,
-        before: op.beforeState,
+        identity,
+        before,
         after: payload,
         message: `Staged ${op.id}: ${op.description}. Approve via execute_operation or from the approval UI.`
       });
@@ -775,6 +856,7 @@ export function registerTools(server, crmClient) {
             number: m.msp_milestonenumber,
             name: m.msp_name,
             status: fv(m, 'msp_milestonestatus'),
+            commitment: commitmentLabel(m),
             date: toIsoDate(m.msp_milestonedate),
             opportunity: fv(m, '_msp_opportunityid_value'),
             workload: fv(m, '_msp_workloadlkid_value')
@@ -820,7 +902,7 @@ export function registerTools(server, crmClient) {
       const result = await crmClient.requestAllPages('msp_engagementmilestones', {
         query: {
           $filter: filters.join(' and '),
-          $select: 'msp_engagementmilestoneid,msp_milestonenumber,msp_name,msp_milestonestatus,msp_milestonedate,msp_monthlyuse,_msp_opportunityid_value',
+          $select: 'msp_engagementmilestoneid,msp_milestonenumber,msp_name,msp_milestonestatus,msp_commitmentrecommendation,msp_milestonedate,msp_monthlyuse,_msp_opportunityid_value',
           $orderby: 'msp_milestonedate asc'
         }
       });
@@ -841,6 +923,7 @@ export function registerTools(server, crmClient) {
         title: m.msp_name,
         milestoneNumber: m.msp_milestonenumber,
         status: m['msp_milestonestatus@OData.Community.Display.V1.FormattedValue'] ?? m.msp_milestonestatus,
+        commitment: commitmentLabel(m),
         monthlyUse: m.msp_monthlyuse ?? null,
         opportunityId: m._msp_opportunityid_value ?? null,
         opportunityName: opportunityNames[m._msp_opportunityid_value] ?? null
@@ -1021,6 +1104,26 @@ export function registerTools(server, crmClient) {
       const op = queue.approve(id);
       if (!op) return error(`Operation ${id} not found, already executed, or expired.`);
 
+      // Pre-execution integrity check for milestone updates
+      if (op.type === 'update_milestone' && op.identity?.milestoneNumber) {
+        const recheck = await crmClient.request(op.entitySet, {
+          query: { $select: 'msp_milestonenumber,msp_name,_msp_opportunityid_value' }
+        });
+        if (!recheck.ok) {
+          queue.markFailed(id, 'Pre-execution verification failed: milestone no longer accessible');
+          return error(`${id} aborted: milestone no longer accessible (${recheck.status}). The record may have been deleted.`);
+        }
+        const currentNumber = recheck.data?.msp_milestonenumber;
+        if (currentNumber && currentNumber !== op.identity.milestoneNumber) {
+          queue.markFailed(id, `Milestone number mismatch: expected ${op.identity.milestoneNumber}, got ${currentNumber}`);
+          return error(
+            `${id} aborted: milestone identity mismatch. ` +
+            `Expected milestone number ${op.identity.milestoneNumber} but record at this GUID is ${currentNumber}. ` +
+            `This may indicate the wrong milestone was targeted.`
+          );
+        }
+      }
+
       // Execute against CRM
       let result;
       if (op.type === 'close_task') {
@@ -1059,6 +1162,24 @@ export function registerTools(server, crmClient) {
         if (!approved) {
           results.push({ id: op.id, success: false, reason: 'expired or missing' });
           continue;
+        }
+
+        // Pre-execution integrity check for milestone updates
+        if (op.type === 'update_milestone' && op.identity?.milestoneNumber) {
+          const recheck = await crmClient.request(op.entitySet, {
+            query: { $select: 'msp_milestonenumber,msp_name,_msp_opportunityid_value' }
+          });
+          if (!recheck.ok) {
+            queue.markFailed(op.id, 'Pre-execution verification failed: milestone no longer accessible');
+            results.push({ id: op.id, success: false, reason: 'milestone no longer accessible' });
+            continue;
+          }
+          const currentNumber = recheck.data?.msp_milestonenumber;
+          if (currentNumber && currentNumber !== op.identity.milestoneNumber) {
+            queue.markFailed(op.id, `Milestone number mismatch: expected ${op.identity.milestoneNumber}, got ${currentNumber}`);
+            results.push({ id: op.id, success: false, reason: `identity mismatch: expected ${op.identity.milestoneNumber}, got ${currentNumber}` });
+            continue;
+          }
         }
 
         let result;

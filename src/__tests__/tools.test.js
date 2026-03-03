@@ -637,6 +637,290 @@ describe('registerTools', () => {
     });
   });
 
+  describe('update_milestone', () => {
+    const MILESTONE_GUID = '12345678-1234-1234-1234-123456789abc';
+    const OPP_GUID = 'aaaa1111-2222-3333-4444-555566667777';
+
+    const makeMilestoneRecord = (overrides = {}) => ({
+      msp_engagementmilestoneid: MILESTONE_GUID,
+      msp_milestonenumber: '7-100000001',
+      msp_name: 'Kickoff Meeting',
+      _msp_opportunityid_value: OPP_GUID,
+      '_msp_opportunityid_value@OData.Community.Display.V1.FormattedValue': 'Contoso AI Platform',
+      _ownerid_value: 'abc-123', // matches WhoAmI
+      msp_milestonedate: '2026-03-01',
+      msp_monthlyuse: 500,
+      msp_forecastcomments: 'On track',
+      ...overrides
+    });
+
+    it('rejects invalid milestoneId GUID', async () => {
+      const result = await callTool(server, 'update_milestone', {
+        milestoneId: 'not-a-guid',
+        milestoneDate: '2026-04-15'
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it('rejects empty update (no fields)', async () => {
+      const result = await callTool(server, 'update_milestone', {
+        milestoneId: MILESTONE_GUID
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it('returns error when milestone is not found', async () => {
+      crm.request.mockImplementation(async (path) => {
+        if (path === 'WhoAmI') return { ok: true, status: 200, data: { UserId: 'abc-123' } };
+        if (path.startsWith('msp_engagementmilestones(')) return { ok: false, status: 404, data: { message: 'Not Found' } };
+        return { ok: true, status: 200, data: {} };
+      });
+      const result = await callTool(server, 'update_milestone', {
+        milestoneId: MILESTONE_GUID,
+        milestoneDate: '2026-04-15'
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('not found or inaccessible');
+    });
+
+    it('stages update with identity metadata when user owns milestone', async () => {
+      crm.request.mockImplementation(async (path) => {
+        if (path === 'WhoAmI') return { ok: true, status: 200, data: { UserId: 'abc-123' } };
+        if (path.startsWith('msp_engagementmilestones(')) return { ok: true, status: 200, data: makeMilestoneRecord() };
+        return { ok: true, status: 200, data: {} };
+      });
+
+      const result = await callTool(server, 'update_milestone', {
+        milestoneId: MILESTONE_GUID,
+        milestoneDate: '2026-04-15'
+      });
+      expect(result.isError).toBeUndefined();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.staged).toBe(true);
+      expect(parsed.identity.milestoneNumber).toBe('7-100000001');
+      expect(parsed.identity.milestoneName).toBe('Kickoff Meeting');
+      expect(parsed.identity.opportunityName).toBe('Contoso AI Platform');
+      expect(parsed.description).toContain('7-100000001');
+      expect(parsed.description).toContain('Contoso AI Platform');
+      expect(parsed.before.msp_milestonedate).toBe('2026-03-01');
+      expect(parsed.after.msp_milestonedate).toBe('2026-04-15');
+    });
+
+    it('allows update when user is on the deal team (owns other milestones under same opp)', async () => {
+      crm.request.mockImplementation(async (path) => {
+        if (path === 'WhoAmI') return { ok: true, status: 200, data: { UserId: 'abc-123' } };
+        if (path.startsWith('msp_engagementmilestones(')) {
+          return { ok: true, status: 200, data: makeMilestoneRecord({ _ownerid_value: 'other-user-id' }) };
+        }
+        if (path.startsWith('opportunities(')) {
+          return { ok: true, status: 200, data: { _ownerid_value: 'other-user-id' } };
+        }
+        return { ok: true, status: 200, data: {} };
+      });
+      crm.requestAllPages.mockImplementation(async (entity) => {
+        if (entity === 'msp_engagementmilestones') {
+          return { ok: true, status: 200, data: { value: [{ msp_engagementmilestoneid: 'other-ms' }] } };
+        }
+        return { ok: true, status: 200, data: { value: [] } };
+      });
+
+      const result = await callTool(server, 'update_milestone', {
+        milestoneId: MILESTONE_GUID,
+        monthlyUse: 1000
+      });
+      expect(result.isError).toBeUndefined();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.staged).toBe(true);
+    });
+
+    it('rejects update when user is not owner and not on deal team', async () => {
+      crm.request.mockImplementation(async (path) => {
+        if (path === 'WhoAmI') return { ok: true, status: 200, data: { UserId: 'abc-123' } };
+        if (path.startsWith('msp_engagementmilestones(')) {
+          return { ok: true, status: 200, data: makeMilestoneRecord({ _ownerid_value: 'other-user-id' }) };
+        }
+        if (path.startsWith('opportunities(')) {
+          return { ok: true, status: 200, data: { _ownerid_value: 'other-user-id' } };
+        }
+        return { ok: true, status: 200, data: {} };
+      });
+      crm.requestAllPages.mockImplementation(async () => {
+        return { ok: true, status: 200, data: { value: [] } };
+      });
+
+      const result = await callTool(server, 'update_milestone', {
+        milestoneId: MILESTONE_GUID,
+        milestoneDate: '2026-04-15'
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Ownership check failed');
+      expect(result.content[0].text).toContain('not on the deal team');
+    });
+
+    it('rejects update when milestone has no opportunity and user is not owner', async () => {
+      crm.request.mockImplementation(async (path) => {
+        if (path === 'WhoAmI') return { ok: true, status: 200, data: { UserId: 'abc-123' } };
+        if (path.startsWith('msp_engagementmilestones(')) {
+          return { ok: true, status: 200, data: makeMilestoneRecord({
+            _ownerid_value: 'other-user-id',
+            _msp_opportunityid_value: null
+          }) };
+        }
+        return { ok: true, status: 200, data: {} };
+      });
+
+      const result = await callTool(server, 'update_milestone', {
+        milestoneId: MILESTONE_GUID,
+        monthlyUse: 999
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('no linked opportunity');
+    });
+
+    it('allows update when user owns the parent opportunity', async () => {
+      crm.request.mockImplementation(async (path) => {
+        if (path === 'WhoAmI') return { ok: true, status: 200, data: { UserId: 'abc-123' } };
+        if (path.startsWith('msp_engagementmilestones(')) {
+          return { ok: true, status: 200, data: makeMilestoneRecord({ _ownerid_value: 'other-user-id' }) };
+        }
+        if (path.startsWith('opportunities(')) {
+          return { ok: true, status: 200, data: { _ownerid_value: 'abc-123' } };
+        }
+        return { ok: true, status: 200, data: {} };
+      });
+
+      const result = await callTool(server, 'update_milestone', {
+        milestoneId: MILESTONE_GUID,
+        forecastComments: 'Updated forecast'
+      });
+      expect(result.isError).toBeUndefined();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.staged).toBe(true);
+    });
+  });
+
+  describe('update_milestone execution integrity', () => {
+    const MILESTONE_GUID = '12345678-1234-1234-1234-123456789abc';
+    const OPP_GUID = 'aaaa1111-2222-3333-4444-555566667777';
+
+    // Suppress 'error' events from ApprovalQueue (EventEmitter throws unhandled)
+    beforeEach(() => {
+      getApprovalQueue().on('error', () => {});
+    });
+
+    it('execute_operation blocks when milestone number does not match staged identity', async () => {
+      // Stage an update with identity
+      crm.request.mockImplementation(async (path) => {
+        if (path === 'WhoAmI') return { ok: true, status: 200, data: { UserId: 'abc-123' } };
+        if (path.startsWith('msp_engagementmilestones(')) {
+          return { ok: true, status: 200, data: {
+            msp_engagementmilestoneid: MILESTONE_GUID,
+            msp_milestonenumber: '7-100000001',
+            msp_name: 'Kickoff',
+            _msp_opportunityid_value: OPP_GUID,
+            _ownerid_value: 'abc-123',
+            msp_milestonedate: '2026-03-01'
+          } };
+        }
+        return { ok: true, status: 200, data: {} };
+      });
+
+      await callTool(server, 'update_milestone', {
+        milestoneId: MILESTONE_GUID,
+        milestoneDate: '2026-04-15'
+      });
+
+      // Now at execution time, the record returns a different milestone number
+      crm.request.mockImplementation(async (path, opts) => {
+        if (path.startsWith('msp_engagementmilestones(') && !opts?.method) {
+          return { ok: true, status: 200, data: {
+            msp_milestonenumber: '7-DIFFERENT',
+            msp_name: 'Wrong Milestone',
+            _msp_opportunityid_value: 'other-opp'
+          } };
+        }
+        return { ok: true, status: 200, data: {} };
+      });
+
+      const result = await callTool(server, 'execute_operation', { id: 'OP-1' });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('identity mismatch');
+      expect(result.content[0].text).toContain('7-100000001');
+    });
+
+    it('execute_operation proceeds when milestone number matches', async () => {
+      crm.request.mockImplementation(async (path) => {
+        if (path === 'WhoAmI') return { ok: true, status: 200, data: { UserId: 'abc-123' } };
+        if (path.startsWith('msp_engagementmilestones(')) {
+          return { ok: true, status: 200, data: {
+            msp_engagementmilestoneid: MILESTONE_GUID,
+            msp_milestonenumber: '7-100000001',
+            msp_name: 'Kickoff',
+            _msp_opportunityid_value: OPP_GUID,
+            _ownerid_value: 'abc-123',
+            msp_milestonedate: '2026-03-01'
+          } };
+        }
+        return { ok: true, status: 200, data: {} };
+      });
+
+      await callTool(server, 'update_milestone', {
+        milestoneId: MILESTONE_GUID,
+        milestoneDate: '2026-04-15'
+      });
+
+      // Execution-time re-check returns matching number, then PATCH succeeds
+      crm.request.mockImplementation(async (path, opts) => {
+        if (path.startsWith('msp_engagementmilestones(') && !opts?.method) {
+          return { ok: true, status: 200, data: { msp_milestonenumber: '7-100000001' } };
+        }
+        if (opts?.method === 'PATCH') {
+          return { ok: true, status: 204, data: null };
+        }
+        return { ok: true, status: 200, data: {} };
+      });
+
+      const result = await callTool(server, 'execute_operation', { id: 'OP-1' });
+      expect(result.isError).toBeUndefined();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+    });
+
+    it('execute_operation aborts when milestone is no longer accessible', async () => {
+      crm.request.mockImplementation(async (path) => {
+        if (path === 'WhoAmI') return { ok: true, status: 200, data: { UserId: 'abc-123' } };
+        if (path.startsWith('msp_engagementmilestones(')) {
+          return { ok: true, status: 200, data: {
+            msp_engagementmilestoneid: MILESTONE_GUID,
+            msp_milestonenumber: '7-100000001',
+            msp_name: 'Kickoff',
+            _msp_opportunityid_value: OPP_GUID,
+            _ownerid_value: 'abc-123',
+            msp_milestonedate: '2026-03-01'
+          } };
+        }
+        return { ok: true, status: 200, data: {} };
+      });
+
+      await callTool(server, 'update_milestone', {
+        milestoneId: MILESTONE_GUID,
+        milestoneDate: '2026-04-15'
+      });
+
+      // At execution time, record is gone
+      crm.request.mockImplementation(async (path, opts) => {
+        if (path.startsWith('msp_engagementmilestones(') && !opts?.method) {
+          return { ok: false, status: 404, data: { message: 'Not Found' } };
+        }
+        return { ok: true, status: 200, data: {} };
+      });
+
+      const result = await callTool(server, 'execute_operation', { id: 'OP-1' });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('no longer accessible');
+    });
+  });
+
   describe('list_accounts_by_tpid', () => {
     it('rejects non-numeric TPIDs', async () => {
       const result = await callTool(server, 'list_accounts_by_tpid', { tpids: ['abc'] });
