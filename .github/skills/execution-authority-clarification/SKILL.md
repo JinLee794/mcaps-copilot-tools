@@ -1,6 +1,6 @@
 ---
 name: execution-authority-clarification
-description: 'Tie-break resolver for contradictory guidance: when CSA and CSAM give conflicting direction on the same work item, assigns an explicit decision-owner per disputed area. Triggers: tie-break, conflicting direction, who decides, contradictory guidance, CSA vs CSAM dispute, authority overlap.'
+description: 'Execution authority clarification: resolves contradictory guidance when CSA and CSAM give conflicting direction on the same work item by assigning explicit decision-owners per disputed area. Triggers: tie-break, conflicting direction, who decides, contradictory guidance, CSA vs CSAM dispute, authority overlap.'
 argument-hint: 'Provide opportunityId and milestoneId(s) under disputed direction'
 ---
 

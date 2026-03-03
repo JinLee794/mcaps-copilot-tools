@@ -1,6 +1,6 @@
 ---
 name: pipeline-hygiene-triage
-description: 'Specialist portfolio cleanup: flags stale opportunities, missing CRM fields, close-date slippage, and low-quality pipeline entries. Generates exception report with bulk-fix suggestions for forecast preparation. Triggers: portfolio cleanup, stale opportunities, missing fields, forecast prep, pipeline exceptions, close-date slip, bulk fix.'
+description: 'Pipeline hygiene triage for Specialist: flags stale opportunities, missing CRM fields, close-date slippage, and low-quality entries. Generates exception report with bulk-fix suggestions for forecast prep. Triggers: portfolio cleanup, stale opportunities, missing fields, forecast prep, pipeline exceptions, close-date slip.'
 argument-hint: 'Scope by opportunityId(s) or sweep all active Specialist-owned pipeline'
 ---
 

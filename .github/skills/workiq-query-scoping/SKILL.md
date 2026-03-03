@@ -1,6 +1,6 @@
 ---
 name: workiq-query-scoping
-description: 'Scope broad WorkIQ requests into bounded, relevant retrieval across meetings, chats, email, and SharePoint/OneDrive content.'
+description: 'WorkIQ query scoping: narrows broad requests into bounded, relevant retrieval across meetings, chats, email, and SharePoint/OneDrive content. Triggers: WorkIQ, scope query, narrow search, meeting notes, email lookup, chat retrieval, SharePoint search.'
 argument-hint: 'Paste the user request and any known constraints (people, customer, time, source types, output needed)'
 ---
 

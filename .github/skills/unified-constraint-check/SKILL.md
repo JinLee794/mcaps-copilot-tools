@@ -1,6 +1,6 @@
 ---
 name: unified-constraint-check
-description: 'Microsoft Unified Support program gate: detects work items that depend on Unified dispatch but lack required eligibility proof, accreditation credentials, or catalog alignment. Purely about Unified program logistics, not general technical feasibility. Triggers: Unified Support, dispatch readiness, accreditation gap, eligibility proof, Unified catalog, Unified blocker.'
+description: 'Unified constraint check: detects work items needing Unified dispatch that lack eligibility proof, accreditation, or catalog alignment. Purely about Unified program logistics, not general feasibility. Triggers: Unified Support, dispatch readiness, accreditation gap, eligibility proof, Unified catalog, Unified blocker.'
 argument-hint: 'Provide opportunityId with Unified Support dispatch dependencies'
 ---
 

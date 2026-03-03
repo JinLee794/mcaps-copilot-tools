@@ -1,6 +1,6 @@
 ---
 name: adoption-excellence-review
-description: 'Post-deployment consumption scorecard: audits usage telemetry (MAU, DAU, license utilization) against consumption targets. Compares actuals to success-plan baselines and flags adoption shortfalls needing stakeholder intervention. Triggers: consumption scorecard, MAU, DAU, usage telemetry, adoption gap, license utilization, consumption vs target.'
+description: 'Adoption excellence review: audits usage telemetry (MAU, DAU, license utilization) against consumption targets. Compares actuals to success-plan baselines and flags shortfalls needing stakeholder intervention. Triggers: consumption scorecard, MAU, DAU, usage telemetry, adoption gap, license utilization, consumption vs target.'
 argument-hint: 'Scope by opportunityId(s) or run across all CSAM-owned consumption targets'
 ---
 

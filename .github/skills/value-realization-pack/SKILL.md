@@ -1,6 +1,6 @@
 ---
 name: value-realization-pack
-description: 'ROI and business-impact report: validates that completed deliverables have measurable outcome definitions, tracking instrumentation, and documented results. Closes gaps where value was delivered but never quantified. Triggers: ROI report, business impact, outcome measurement, value quantification, impact evidence, value tracking proof.'
+description: 'Value realization pack: validates that completed deliverables have measurable outcome definitions, tracking instrumentation, and documented results. Closes gaps where value was delivered but never quantified. Triggers: ROI report, business impact, outcome measurement, value quantification, impact evidence, value tracking proof.'
 argument-hint: 'Provide opportunityId for deliverables entering the value-quantification phase'
 ---
 

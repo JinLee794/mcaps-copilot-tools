@@ -1,6 +1,6 @@
 ---
 name: non-linear-progression
-description: 'Loopback advisor: guides when and how to regress a deal to an earlier MCEM phase after proof failures, scope pivots, or buyer-readiness gaps. Provides re-entry requirements for the target phase. Triggers: loopback, regression, go back, roll back, proof failed rework, scope pivot, re-entry, deal regression.'
+description: 'Non-linear progression advisor: guides when and how to regress a deal to an earlier MCEM phase after proof failures, scope pivots, or buyer-readiness gaps. Provides re-entry requirements. Triggers: loopback, regression, go back, roll back, proof failed rework, scope pivot, re-entry, deal regression.'
 argument-hint: 'Provide opportunityId and describe the triggering event (proof failure, scope change, etc.)'
 ---
 

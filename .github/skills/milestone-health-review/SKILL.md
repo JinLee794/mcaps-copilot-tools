@@ -1,6 +1,6 @@
 ---
 name: milestone-health-review
-description: 'CSAM weekly status report: scans committed work for date drift, blocked items, and overdue completions. Generates internal remediation queue and customer update document with dry-run corrections. Triggers: weekly status, date drift, blocked items, overdue, committed status scan, CSAM report.'
+description: 'Milestone health review for CSAM: scans committed work for date drift, blocked items, and overdue completions. Generates remediation queue and customer update document with dry-run corrections. Triggers: weekly status, date drift, blocked items, overdue, committed status scan, CSAM report.'
 argument-hint: 'Scope by opportunityId(s) or run across all CSAM-governed committed work'
 ---
 

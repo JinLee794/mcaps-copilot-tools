@@ -1,6 +1,6 @@
 ---
 name: task-hygiene-flow
-description: 'SE CRM-task-record inspector: reads each task row for correct owner, due date, status, and blocker notes. Patches stale or orphaned entries via dry-run. Operates at individual task-row level, not parent milestone. Triggers: task record inspector, SE daily check, stale tasks, orphaned tasks, task owner, task due date, CRM task row.'
+description: 'Task hygiene flow for SE: reads each CRM task row for correct owner, due date, status, and blocker notes. Patches stale or orphaned entries via dry-run at individual task-row level. Triggers: task record inspector, SE daily check, stale tasks, orphaned tasks, task owner, task due date, CRM task row.'
 argument-hint: 'Scope by opportunityId(s) or sweep all SE-owned active task records'
 ---
 

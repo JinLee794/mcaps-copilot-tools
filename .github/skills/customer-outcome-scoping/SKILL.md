@@ -1,6 +1,6 @@
 ---
 name: customer-outcome-scoping
-description: 'Success-criteria definition workshop: helps define explicit, measurable KPIs (metrics, baselines, targets) during initial engagement so downstream workflows have clear outcome anchors. Produces structured success-plan entries. Triggers: define KPIs, success criteria, measurable targets, baseline definition, outcome workshop, success plan creation.'
+description: 'Customer outcome scoping workshop: defines explicit, measurable KPIs (metrics, baselines, targets) during initial engagement so downstream workflows have clear anchors. Produces structured success-plan entries. Triggers: define KPIs, success criteria, measurable targets, baseline definition, outcome workshop, success plan creation.'
 argument-hint: 'Provide account identifier and initial customer context for KPI definition'
 ---
 
