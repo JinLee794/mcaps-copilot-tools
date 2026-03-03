@@ -1,7 +1,7 @@
 ---
 name: commit-gate-enforcement
-description: 'Validates milestone readiness before commitment by checking delivery path, capacity, resource alignment, and target dates. Generates remediation tasks as dry-run payloads. Use when CSAM or CSA is evaluating commit readiness at MCEM Stage 3, or when milestone commitment recommendation is proposed for committed. Triggers: commit readiness, commitment gate, ready to commit, commit check, Stage 3 gate.'
-argument-hint: 'Provide opportunityId and milestoneId(s) approaching commitment'
+description: 'Pre-commitment readiness gate: validates resource capacity, delivery-path clarity, and target-date realism BEFORE flipping a work item to committed status. Returns remediation tasks when gaps are found. Triggers: pre-commitment gate, should we commit, readiness before signing, resource capacity check, commit decision, before committing.'
+argument-hint: 'Provide opportunityId and milestoneId(s) being evaluated for commitment'
 ---
 
 ## Purpose

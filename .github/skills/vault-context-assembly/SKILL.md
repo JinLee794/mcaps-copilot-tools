@@ -1,7 +1,7 @@
 ---
 name: vault-context-assembly
-description: 'Assembles customer context from Obsidian vault for CRM prefetch and cross-medium synthesis at any MCEM stage. Provides durable knowledge layer supporting all role workflows. Use when any role needs vault context, customer notes, CRM prefetch data, customer roster lookup, or prior engagement history. Triggers: vault context, customer notes, vault lookup, prefetch, customer history, vault assembly, durable memory.'
-argument-hint: 'Provide customer or account identifier for vault context retrieval'
+description: 'Obsidian vault retriever: fetches customer notes, engagement history, and durable context from the local Obsidian knowledge store. Provides CRM-prefetch data and prior-session memory to other workflows. Triggers: vault lookup, Obsidian notes, local knowledge store, vault file retrieval, prefetch data, customer notes file, durable memory.'
+argument-hint: 'Provide customer name or account identifier for vault file retrieval'
 ---
 
 ## Purpose

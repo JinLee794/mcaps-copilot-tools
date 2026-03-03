@@ -1,7 +1,7 @@
 ---
 name: architecture-execution-handoff
-description: 'Produces structured CSA handoff note when proof completes or milestone flips from uncommitted to committed at MCEM Stage 3-4 transition. Documents architecture decisions, constraints, risks, success metrics, and next actions. Use when CSA completes proof, milestone commits, or asks about handoff note, architecture summary, or proof-to-delivery transition. Triggers: architecture handoff, proof complete, CSA handoff note, proof-to-delivery, Stage 3-4 transition, execution handoff.'
-argument-hint: 'Provide opportunityId with milestones transitioning from proof to committed delivery'
+description: 'CSA handoff document generator: produces a structured architecture decision record (decisions, constraints, guardrails, success KPIs) when a proof-of-concept concludes. Output is the written handoff artifact itself. Triggers: write handoff note, architecture decision record, POC concluded, CSA document, proof summary writeup, handoff artifact.'
+argument-hint: 'Provide opportunityId with a proof-of-concept reaching conclusion'
 ---
 
 ## Purpose

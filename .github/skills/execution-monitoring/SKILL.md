@@ -1,7 +1,7 @@
 ---
 name: execution-monitoring
-description: 'Monitors committed milestone execution for CSA at MCEM Stage 4 by checking risk state, dependencies, architecture guardrails, and execution blockers. Produces risk dashboard and remediation plan. Use when CSA runs daily or weekly execution sweep, or asks about committed milestone risk, execution blockers, or delivery dependencies. Triggers: execution monitoring, committed risk, execution sweep, delivery blockers, architecture guardrails, Stage 4 monitoring.'
-argument-hint: 'Provide opportunityId(s) or run across all CSA-owned committed milestones'
+description: 'CSA guardrail scanner: checks committed architecture decisions against live dependency state and flags breaches, bottlenecks, and unresolved blockers. Produces a prioritized punch-list. Triggers: guardrail scanner, architecture breach, dependency check, bottleneck, live state check, CSA punch-list.'
+argument-hint: 'Run across CSA-owned committed work or specify opportunityId(s) for targeted scan'
 ---
 
 ## Purpose

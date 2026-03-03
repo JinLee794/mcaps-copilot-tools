@@ -1,7 +1,7 @@
 ---
 name: pipeline-hygiene-triage
-description: 'Triages pipeline exceptions for Specialist at MCEM Stages 2-3 by detecting stage staleness, date drift, missing required fields, and low-quality opportunities. Generates prioritized exception list and dry-run corrections. Use when Specialist runs weekly pipeline review, pre-forecast hygiene check, or asks about pipeline health, stale opportunities, or field completeness. Triggers: pipeline hygiene, stage staleness, pipeline review, forecast prep, field completeness.'
-argument-hint: 'Provide opportunityId(s) or run across all active Specialist opportunities'
+description: 'Specialist portfolio cleanup: flags stale opportunities, missing CRM fields, close-date slippage, and low-quality pipeline entries. Generates exception report with bulk-fix suggestions for forecast preparation. Triggers: portfolio cleanup, stale opportunities, missing fields, forecast prep, pipeline exceptions, close-date slip, bulk fix.'
+argument-hint: 'Scope by opportunityId(s) or sweep all active Specialist-owned pipeline'
 ---
 
 ## Purpose

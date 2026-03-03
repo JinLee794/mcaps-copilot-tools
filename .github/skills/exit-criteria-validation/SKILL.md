@@ -1,7 +1,7 @@
 ---
 name: exit-criteria-validation
-description: 'Validates opportunity progress against formal MCEM exit criteria for the current stage using Verifiable Outcomes from CRM entity state. Available at any MCEM stage. Use when any role checks stage readiness, validates exit criteria, prepares for stage transition, or asks about stage progression readiness. Triggers: exit criteria, stage readiness, stage gate, stage transition, ready to advance, progression check.'
-argument-hint: 'Provide opportunityId and current or target MCEM stage'
+description: 'Formal gate-check: evaluates each Verifiable Outcome against CRM entity state and returns a criterion-by-criterion verdict with evidence links. Determines whether advancement conditions are satisfied. Triggers: exit criteria, gate check, criteria met, Verifiable Outcome check, formal gate, advancement readiness.'
+argument-hint: 'Provide opportunityId and the target stage number to validate against'
 ---
 
 ## Purpose

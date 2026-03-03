@@ -1,7 +1,7 @@
 ---
 name: value-realization-pack
-description: 'Produces value realization assessment for CSA at MCEM Stages 4-5. Validates that committed milestones have measurable outcome definitions, tracking mechanisms, and delivery evidence. Generates gap closures for under-specified value milestones. Use when CSA enters Realize Value phase, prepares value realization report, or asks about outcome measurement, value tracking, or Stage 4-5 readiness. Triggers: value realization, outcome measurement, value tracking, Stage 4-5 value, realization pack, value evidence.'
-argument-hint: 'Provide opportunityId entering or in Realize Value / Manage & Optimize phase'
+description: 'ROI and business-impact report: validates that completed deliverables have measurable outcome definitions, tracking instrumentation, and documented results. Closes gaps where value was delivered but never quantified. Triggers: ROI report, business impact, outcome measurement, value quantification, impact evidence, value tracking proof.'
+argument-hint: 'Provide opportunityId for deliverables entering the value-quantification phase'
 ---
 
 ## Purpose

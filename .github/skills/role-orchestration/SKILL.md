@@ -1,7 +1,7 @@
 ---
 name: role-orchestration
-description: 'Recommends which role (ATU/STU/CSU/Partner) should lead next actions based on MCEM stage ownership and current opportunity state. Prevents action paralysis when multiple roles are involved. Available at any MCEM stage. Use when user asks who should lead, who owns next steps, role coordination, or asks about role handoff across stages. Triggers: role orchestration, who leads, who owns, role handoff, stage ownership, role coordination.'
-argument-hint: 'Provide opportunityId and the action or decision needing role clarity'
+description: 'Next-action team router: given current deal state, recommends which organizational unit (ATU, STU, CSU, or Partner) should own the immediate next step. Prevents action paralysis from multi-team overlap. Triggers: who leads next, team assignment, action paralysis, ATU/STU/CSU routing, which team, next-step owner.'
+argument-hint: 'Provide opportunityId and the specific action or decision needing team assignment'
 ---
 
 ## Purpose

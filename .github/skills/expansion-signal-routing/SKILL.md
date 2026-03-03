@@ -1,7 +1,7 @@
 ---
 name: expansion-signal-routing
-description: 'Routes expansion signals from CSAM delivery/adoption context to Specialist for pipeline creation at MCEM Stage 5. Requires CSAM timing alignment before opportunity creation. Use when CSAM or CSA identifies expansion potential during delivery or optimization, or when expansion signals appear without owner routing. Triggers: expansion signal, expansion routing, growth opportunity, new pipeline from delivery, Stage 5 expansion, upsell signal.'
-argument-hint: 'Provide opportunityId where expansion signal was detected'
+description: 'Upsell/cross-sell router: when a growth signal surfaces during active delivery or post-deployment optimization, captures the signal and routes it to Specialist for net-new deal creation. Triggers: upsell detected, cross-sell opportunity, growth signal, land-and-expand, new deal from delivery, expansion routing.'
+argument-hint: 'Provide opportunityId where upsell/cross-sell signal was observed'
 ---
 
 ## Purpose

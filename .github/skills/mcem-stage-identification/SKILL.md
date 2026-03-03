@@ -1,7 +1,7 @@
 ---
 name: mcem-stage-identification
-description: 'Determines the current functional MCEM stage (1–5) of an opportunity by evaluating Verifiable Outcomes and exit criteria rather than just CRM field status. Identifies stage misalignment or non-linear regression needs. Use when a Specialist, SE, CSA, or CSAM needs to confirm process readiness or triage a stalled opportunity.'
-argument-hint: 'Provide the opportunityId'
+description: 'Diagnostic triage: pinpoints which MCEM process step (1-5) an opportunity actually occupies by reading CRM entity state, not just the recorded field label. Detects when labeled step and functional reality diverge. Use when triaging a stalled deal or confirming where an opportunity truly sits. Triggers: which stage, what stage, stage mismatch, triage stalled, diagnose position, identify step.'
+argument-hint: 'Provide opportunityId to diagnose'
 ---
 
 ## Purpose

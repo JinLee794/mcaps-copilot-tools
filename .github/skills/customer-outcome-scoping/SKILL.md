@@ -1,7 +1,7 @@
 ---
 name: customer-outcome-scoping
-description: 'Defines measurable customer outcomes for CSAM at MCEM Stage 1 during Listen and Consult. Ensures customer success measures are explicit, measurable, and linked to opportunity and success plan structures. Use when CSAM scopes customer outcomes, defines success measures, or asks about outcome clarity, customer priorities, or success plan creation. Triggers: customer outcomes, success measures, outcome scoping, Stage 1 outcomes, customer priorities, measurable outcomes.'
-argument-hint: 'Provide account identifier and customer context for outcome scoping'
+description: 'Success-criteria definition workshop: helps define explicit, measurable KPIs (metrics, baselines, targets) during initial engagement so downstream workflows have clear outcome anchors. Produces structured success-plan entries. Triggers: define KPIs, success criteria, measurable targets, baseline definition, outcome workshop, success plan creation.'
+argument-hint: 'Provide account identifier and initial customer context for KPI definition'
 ---
 
 ## Purpose

@@ -1,7 +1,7 @@
 ---
 name: unified-constraint-check
-description: 'Detects Unified-dependent milestones without eligibility, accreditation, or dispatch readiness evidence at MCEM Stages 3-4. Surfaces constraints before execution commitments. Use when CSA or CSAM encounters Unified delivery dependencies, dispatch blockers, eligibility gaps, or accreditation requirements. Triggers: Unified constraints, dispatch readiness, eligibility check, Unified blocker, accreditation gap, Unified dependency.'
-argument-hint: 'Provide opportunityId for milestones with Unified delivery dependencies'
+description: 'Microsoft Unified Support program gate: detects work items that depend on Unified dispatch but lack required eligibility proof, accreditation credentials, or catalog alignment. Purely about Unified program logistics, not general technical feasibility. Triggers: Unified Support, dispatch readiness, accreditation gap, eligibility proof, Unified catalog, Unified blocker.'
+argument-hint: 'Provide opportunityId with Unified Support dispatch dependencies'
 ---
 
 ## Purpose

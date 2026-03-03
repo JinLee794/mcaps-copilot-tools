@@ -1,7 +1,7 @@
 ---
 name: proof-plan-orchestration
-description: 'Orchestrates technical proof requirements for SE and Specialist at MCEM Stages 2-3. Defines proof scope (POC/Pilot/Demo), success criteria, milestone plan, and role assignments. Use when SE or Specialist designs proof plan, scopes POC/Pilot, defines success criteria, or asks about proof requirements or technical win planning. Triggers: proof plan, POC scope, pilot planning, demo requirements, technical proof, success criteria, proof orchestration.'
-argument-hint: 'Provide opportunityId and proof type (POC/Pilot/Demo)'
+description: 'POC/Pilot/Demo blueprint builder: defines trial scope, acceptance criteria, timeline, environment needs, and role assignments for a technical proof. Outputs a structured plan ready for SE and Specialist execution. Triggers: POC design, pilot blueprint, demo plan, trial scope, proof requirements, technical win plan.'
+argument-hint: 'Provide opportunityId and proof format (POC, Pilot, or Demo)'
 ---
 
 ## Purpose

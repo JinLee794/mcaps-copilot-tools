@@ -1,7 +1,7 @@
 ---
 name: adoption-excellence-review
-description: 'Reviews usage and adoption health for CSAM at MCEM Stage 5. Checks adoption milestone progress, stakeholder coverage, consumption targets, and success plan alignment. Generates coordination actions for adoption gaps. Use when CSAM reviews adoption milestones, usage trends, consumption targets, or asks about adoption health, usage gaps, or Stage 5 optimization. Triggers: adoption review, usage health, consumption targets, adoption milestones, Stage 5 health, optimization review.'
-argument-hint: 'Provide opportunityId(s) or run across all CSAM-owned adoption milestones'
+description: 'Post-deployment consumption scorecard: audits usage telemetry (MAU, DAU, license utilization) against consumption targets. Compares actuals to success-plan baselines and flags adoption shortfalls needing stakeholder intervention. Triggers: consumption scorecard, MAU, DAU, usage telemetry, adoption gap, license utilization, consumption vs target.'
+argument-hint: 'Scope by opportunityId(s) or run across all CSAM-owned consumption targets'
 ---
 
 ## Purpose

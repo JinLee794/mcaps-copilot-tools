@@ -1,7 +1,7 @@
 ---
 name: risk-surfacing
-description: 'Proactive risk detection across CRM, M365, and vault mediums for any role at any MCEM stage. Synthesizes signals from multiple sources to surface execution, relationship, and delivery risks before they escalate. Use when any role asks about risks, wants risk review, checks account health, or performs proactive risk analysis. Triggers: risk surfacing, risk detection, risk review, account health, risk signals, proactive risk, what risks, deal risks.'
-argument-hint: 'Provide opportunityId or accountId for risk analysis scope'
+description: 'Deal-risk radar: synthesizes field data, vault notes, and calendar signals to flag relationship decay, silent stakeholders, and looming threats. Proactive early-warning system, not a document compiler. Triggers: deal risk, risk radar, threat flag, warning signal, silent stakeholder, relationship decay, early warning.'
+argument-hint: 'Provide opportunityId or accountId to scope the risk scan'
 ---
 
 ## Purpose

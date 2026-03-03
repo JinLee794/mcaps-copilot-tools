@@ -1,7 +1,7 @@
 ---
 name: non-linear-progression
-description: 'Guides MCEM stage loopback when customer readiness gaps, proof failures, capacity constraints, or scope changes require iteration to an earlier stage. Available at any stage. Use when opportunity needs to loop back, proof failed, scope changed, readiness gaps require rework, or user asks about stage regression or non-linear flow. Triggers: stage loopback, non-linear, stage regression, proof failed, scope change, rework needed, go back to Stage.'
-argument-hint: 'Provide opportunityId and the reason for potential loopback'
+description: 'Loopback advisor: guides when and how to regress a deal to an earlier MCEM phase after proof failures, scope pivots, or buyer-readiness gaps. Provides re-entry requirements for the target phase. Triggers: loopback, regression, go back, roll back, proof failed rework, scope pivot, re-entry, deal regression.'
+argument-hint: 'Provide opportunityId and describe the triggering event (proof failure, scope change, etc.)'
 ---
 
 ## Purpose

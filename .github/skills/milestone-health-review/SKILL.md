@@ -1,7 +1,7 @@
 ---
 name: milestone-health-review
-description: 'Reviews committed milestone health for CSAM at MCEM Stages 4-5 by checking status, blockers, date drift, outcome clarity, and recovery plans. Generates customer and internal summaries with dry-run corrections. Use when CSAM runs weekly governance review, customer health check, or asks about milestone status, blocked milestones, or delivery risk. Triggers: milestone health, committed milestone review, governance review, delivery risk, blocked milestones.'
-argument-hint: 'Provide opportunityId(s) or run across all CSAM-owned committed milestones'
+description: 'CSAM weekly status report: scans committed work for date drift, blocked items, and overdue completions. Generates internal remediation queue and customer update document with dry-run corrections. Triggers: weekly status, date drift, blocked items, overdue, committed status scan, CSAM report.'
+argument-hint: 'Scope by opportunityId(s) or run across all CSAM-governed committed work'
 ---
 
 ## Purpose

@@ -1,7 +1,7 @@
 ---
 name: pipeline-qualification
-description: 'Qualifies new opportunities for Specialist at MCEM Stages 1-2 by checking customer priority alignment, commercial fit, solution play validity, and pipeline creation requirements. Generates draft opportunity and milestone structures. Use when Specialist qualifies new signals, creates Stage 2 pipeline, or asks about opportunity qualification, pipeline creation, or new customer signals. Triggers: pipeline qualification, new opportunity, qualify signal, Stage 2 pipeline, create opportunity, customer signal.'
-argument-hint: 'Provide account identifier (TPID or GUID) and customer signal context'
+description: 'Inbound-signal qualifier: scores a new customer signal for commercial fit, solution-play alignment, and priority match, then scaffolds a draft opportunity record with initial milestones. Use to create net-new pipeline from scratch. Triggers: qualify signal, new opportunity, inbound lead, commercial fit, create pipeline, scaffold opportunity, net-new deal.'
+argument-hint: 'Provide account TPID or GUID and the inbound customer signal description'
 ---
 
 ## Purpose

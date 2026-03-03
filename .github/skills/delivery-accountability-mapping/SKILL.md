@@ -1,7 +1,7 @@
 ---
 name: delivery-accountability-mapping
-description: 'Maps delivery accountability for CSAM at MCEM Stage 4 by identifying who owns execution versus orchestration on committed milestones. Flags accountability mismatches where CSAM is treated as delivery owner without decision rights. Use when CSAM is tagged for delivery delays, ownership is unclear, or milestones lack explicit delivery attribution. Triggers: delivery accountability, ownership mapping, who owns delivery, CSAM not delivery PM, accountability mismatch, Stage 4 ownership.'
-argument-hint: 'Provide opportunityId and milestoneId(s) with unclear delivery ownership'
+description: 'RACI mapper: determines who owns hands-on implementation versus who coordinates logistics on committed work. Flags when CSAM is incorrectly tagged as delivery PM without decision rights. Triggers: RACI, who delivers, accountability roster, delivery PM confusion, implementation vs coordination, ownership chart.'
+argument-hint: 'Provide opportunityId and milestoneId(s) with unclear RACI'
 ---
 
 ## Purpose
