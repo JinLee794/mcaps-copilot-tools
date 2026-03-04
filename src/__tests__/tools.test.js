@@ -244,11 +244,11 @@ describe('registerTools', () => {
             '_parentaccountid_value@OData.Community.Display.V1.FormattedValue': 'Contoso Ltd' }
         ] }
       });
-      // Second call: milestones owned by user (deal team discovery)
+      // Second call: msp_dealteams lookup
       crm.requestAllPages.mockResolvedValueOnce({
         ok: true, status: 200, data: { value: [
-          { _msp_opportunityid_value: 'opp-1' },  // already owned — should be deduped
-          { _msp_opportunityid_value: 'opp-2' }   // deal-team only
+          { _msp_parentopportunityid_value: 'opp-1' },  // already owned — should be deduped
+          { _msp_parentopportunityid_value: 'opp-2' }   // deal-team only
         ] }
       });
       // Third call: fetch deal-team opportunities
@@ -278,7 +278,7 @@ describe('registerTools', () => {
             '_parentaccountid_value@OData.Community.Display.V1.FormattedValue': 'Fabrikam Inc' }
         ] }
       });
-      // Milestones: no additional deal-team opps
+      // msp_dealteams: no additional deal-team opps
       crm.requestAllPages.mockResolvedValueOnce({
         ok: true, status: 200, data: { value: [] }
       });
@@ -301,12 +301,43 @@ describe('registerTools', () => {
             '_parentaccountid_value@OData.Community.Display.V1.FormattedValue': 'Contoso Ltd' }
         ] }
       });
-      // Milestone query fails
+      // msp_dealteams query fails — triggers milestone fallback
+      crm.requestAllPages.mockResolvedValueOnce({ ok: false, status: 404, data: { message: 'Entity not found' } });
+      // Milestone fallback also fails
       crm.requestAllPages.mockResolvedValueOnce({ ok: false, status: 500, data: { message: 'Server error' } });
       const result = await callTool(server, 'get_my_active_opportunities', {});
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.count).toBe(1);
       expect(parsed.opportunities[0].relationship).toBe('owner');
+    });
+
+    it('falls back to milestone ownership when msp_dealteams is unavailable', async () => {
+      crm.requestAllPages.mockResolvedValueOnce({
+        ok: true, status: 200, data: { value: [
+          { opportunityid: 'opp-1', name: 'Contoso AI', _parentaccountid_value: 'acct-1',
+            '_parentaccountid_value@OData.Community.Display.V1.FormattedValue': 'Contoso Ltd' }
+        ] }
+      });
+      // msp_dealteams query fails (entity not available in this environment)
+      crm.requestAllPages.mockResolvedValueOnce({ ok: false, status: 404, data: { message: 'Resource not found' } });
+      // Milestone fallback succeeds
+      crm.requestAllPages.mockResolvedValueOnce({
+        ok: true, status: 200, data: { value: [
+          { _msp_opportunityid_value: 'opp-2' }
+        ] }
+      });
+      // Fetch deal-team opportunities from milestone discovery
+      crm.requestAllPages.mockResolvedValueOnce({
+        ok: true, status: 200, data: { value: [
+          { opportunityid: 'opp-2', name: 'Fabrikam Cloud', _parentaccountid_value: 'acct-2',
+            '_parentaccountid_value@OData.Community.Display.V1.FormattedValue': 'Fabrikam Inc' }
+        ] }
+      });
+      const result = await callTool(server, 'get_my_active_opportunities', {});
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.count).toBe(2);
+      expect(parsed.opportunities[0].relationship).toBe('owner');
+      expect(parsed.opportunities[1].relationship).toBe('deal-team');
     });
   });
 
