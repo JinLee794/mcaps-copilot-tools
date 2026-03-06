@@ -1,0 +1,72 @@
+{
+	"servers": {
+		"msx-crm": {
+			"type": "stdio",
+			"command": "node",
+			"args": [
+				"mcp/msx/src/index.js"
+			],
+			"env": {
+				"MSX_CRM_URL": "https://microsoftsales.crm.dynamics.com",
+				"MSX_TENANT_ID": "72f988bf-86f1-41af-91ab-2d7cd011db47",
+				"NODE_ENV": "production"
+			}
+		},
+// "agent365-teamsserver": {
+// 	"type": "http",
+// 	"url": "https://agent365.svc.cloud.microsoft/agents/tenants/${input:tenant_id}/servers/mcp_TeamsServer"
+// },
+// "agent365-m365copilot": {
+// 	"type": "http",
+// 	"url": "https://agent365.svc.cloud.microsoft/agents/tenants/${input:tenant_id}/servers/mcp_M365Copilot"
+// },
+		"agent365-calendartools": {
+			"type": "http",
+			"url": "https://agent365.svc.cloud.microsoft/agents/tenants/${input:tenant_id}/servers/mcp_CalendarTools"
+		},
+		"agent365-wordserver": {
+			"type": "http",
+			"url": "https://agent365.svc.cloud.microsoft/agents/tenants/${input:tenant_id}/servers/mcp_WordServer"
+		},
+		"workiq": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@microsoft/workiq",
+				"mcp"
+			],
+			"type": "stdio"
+		},
+		"outlook-local": {
+			"type": "stdio",
+			"command": "node",
+			"args": [
+				"mcp/outlook/src/index.js"
+			],
+			"env": {
+				"REPO_ROOT": "${workspaceFolder}"
+			}
+		},
+		"linkedin": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": [
+				"linkedin-scraper-mcp"
+			]
+		},
+		"teams-local": {
+			"type": "stdio",
+			"command": "node",
+			"args": [
+				"mcp/teams/src/index.js"
+			]
+		}
+	},
+	"inputs": [
+		{
+			"id": "tenant_id",
+			"type": "promptString",
+			"description": "Microsoft Entra tenant ID (GUID)"
+		}
+	]
+}

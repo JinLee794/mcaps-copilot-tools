@@ -1,0 +1,31 @@
+{
+  "name": "@msx-helper/teams-cache-reader",
+  "version": "0.1.0",
+  "description": "MCP server for reading Microsoft Teams local cache — conversations, messages, contacts, meetings. Zero API calls.",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "teams-cache-mcp": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "mcp",
+    "teams",
+    "cache",
+    "leveldb",
+    "offline"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "snappyjs": "^0.7.0",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
+  }
+}
