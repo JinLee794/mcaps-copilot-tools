@@ -4,6 +4,30 @@
 >
 > Paste everything between `PROMPT START` and `PROMPT END` as a single prompt.
 
+## Table of Contents
+
+- [PROMPT START](#prompt-start)
+  - [Slide 1 — Title](#slide-1--title)
+  - [Slide 2 — The Moment We're In](#slide-2--the-moment-were-in)
+  - [Slide 3 — What Changed](#slide-3--what-changed)
+  - [Slide 4 — The Big Idea](#slide-4--the-big-idea)
+  - [Slide 5 — How This Project Demonstrates It](#slide-5--how-this-project-demonstrates-it)
+  - [Slide 6 — The Pattern (Not the Product)](#slide-6--the-pattern-not-the-product)
+  - [Slide 7 — Natural Language Configuration](#slide-7--natural-language-configuration)
+  - [Slide 8 — MCP: The Universal Connector](#slide-8--mcp-the-universal-connector)
+  - [Slide 9 — Your Knowledge, Compounding](#slide-9--your-knowledge-compounding)
+  - [Slide 10 — Safe by Design](#slide-10--safe-by-design)
+  - [Slide 11 — Guardrails for Builders](#slide-11--guardrails-for-builders)
+  - [Slide 12 — The Interfaces](#slide-12--the-interfaces)
+  - [Slide 13 — What This Looks Like in Practice](#slide-13--what-this-looks-like-in-practice)
+  - [Slide 14 — The Skills You'll Build](#slide-14--the-skills-youll-build)
+  - [Slide 15 — Why Now](#slide-15--why-now)
+  - [Slide 16 — The Invitation](#slide-16--the-invitation)
+  - [Slide 17 — The Moment Is Yours](#slide-17--the-moment-is-yours)
+  - [Slide 18 — Get Started](#slide-18--get-started)
+- [PROMPT END](#prompt-end)
+- [Usage Notes](#usage-notes)
+
 ---
 
 ## PROMPT START

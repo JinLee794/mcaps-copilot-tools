@@ -2,6 +2,29 @@
 
 This document describes how the three MCP servers — **MSX CRM**, **WorkIQ**, and **OIL (optional)** — compose into a unified workflow orchestrated by Copilot. Each server owns a single domain; Copilot orchestrates across them using role cards and atomic skills.
 
+## Table of Contents
+
+- [System Overview](#system-overview)
+  - [How the servers compose](#how-the-servers-compose)
+- [Local Filesystem as Orchestration Substrate](#local-filesystem-as-orchestration-substrate)
+  - [Configuring Your Own Knowledge Layer](#configuring-your-own-knowledge-layer)
+  - [Reliability Constraints](#reliability-constraints)
+- [MCP Routing Model (Recommended)](#mcp-routing-model-recommended)
+  - [Routing rules](#routing-rules)
+- [Role-Skill Binding + Context Stack Transparency](#role-skill-binding--context-stack-transparency)
+- [MSX CRM Read Path](#msx-crm-read-path)
+  - [Primary Read Tools](#primary-read-tools)
+- [MSX CRM Update Path](#msx-crm-update-path)
+  - [Update-Oriented Tools](#update-oriented-tools)
+- [Planned Approval-Based Write Flow](#planned-approval-based-write-flow)
+- [Key Implementation Files](#key-implementation-files)
+  - [MSX CRM Server (`mcp/msx/`)](#msx-crm-server-mcpmsx)
+  - [OIL Server (`mcp/oil/`) — optional](#oil-server-mcpoil--optional)
+- [Cross-Source Workflow (CRM + WorkIQ + Vault)](#cross-source-workflow-crm--workiq--vault)
+  - [Steps](#steps)
+- [Copilot CLI Example Flow (Simple)](#copilot-cli-example-flow-simple)
+- [References](#references)
+
 ## System Overview
 
 ```mermaid

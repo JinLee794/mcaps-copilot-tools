@@ -1,7 +1,8 @@
-# MCAPS Copilot Tools
+![alt text](docs/assets/avatar.png)
 
-![alt text](docs/assets/banner.png)
-> **Your AI-powered sales operations toolkit for MCAPS.**
+# MCAPS IQ 
+
+> **Your AI-powered sales operations toolkit for MCAPS.** (previously known as `MCAPS Copilot Tools`)
 > Talk to Copilot in plain English to manage MSX opportunities, milestones, and tasks — no coding required.
 
 MCAPS Copilot Tools connects GitHub Copilot (in VS Code) to your MSX CRM and Microsoft 365 data through [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) servers. Instead of clicking through MSX screens, you describe what you need in the Copilot chat window and the tools do it for you.
@@ -15,8 +16,26 @@ MCAPS Copilot Tools connects GitHub Copilot (in VS Code) to your MSX CRM and Mic
 
 ---
 
+## Table of Contents
+
+- [Quick Start (5 Minutes)](#quick-start-5-minutes)
+- [Guided Flows (Slash Commands)](#guided-flows-slash-commands)
+- [Alternative: Use with GitHub Copilot CLI](#alternative-use-with-github-copilot-cli)
+- [Try It — Scenario Prompts](#try-it--scenario-prompts)
+- [Optional: Enable Obsidian Vault Integration](#optional-enable-obsidian-vault-integration)
+- [Project Layout](#project-layout)
+- [What's Included](#whats-included)
+- [Write Operations & Responsible AI Use](#write-operations--responsible-ai-use)
+- [How It Works (Under the Hood)](#how-it-works-under-the-hood)
+- [Configuration](#configuration)
+- [Customization — Make It Yours](#customization--make-it-yours)
+- [Frequently Asked Questions](#frequently-asked-questions)
+- [License](#license)
+
+---
+
 ## Quick Start (5 Minutes)
-![alt text](docs/assets/quickstart.png)
+
 
 > **Prerequisites:**
 > - **Connected to the Microsoft corporate VPN** (required to reach internal CRM endpoints)
@@ -82,6 +101,32 @@ Open the GitHub Copilot chat panel (`Ctrl+Shift+I` / `Cmd+Shift+I`) and try the 
 Or just type: `Who am I in MSX?`
 
 > **Something not working?** Run the environment check from the Command Palette: `Cmd+Shift+P` → `Tasks: Run Task` → `Setup: Check Environment`. It will tell you exactly what's missing.
+
+---
+
+## Guided Flows (Slash Commands)
+
+Don't know where to start? You don't need to read this whole README. Just type `/` in the Copilot chat and pick a flow. Each one is role-aware — it detects your CRM identity and tailors the experience.
+
+| Command | When to use | What it does |
+|---|---|---|
+| `/getting-started` | First time setup | Checks your environment, identifies your role, walks you to your first successful action |
+| `/my-role` | Anytime | Shows your MCAPS role, what you're responsible for, and a menu of actions to pick from |
+| `/daily` | Every morning | Runs your role-specific hygiene checks and gives you a prioritized top-3 action list |
+| `/weekly` | Monday / pre-governance | Full pipeline or milestone review with shareable status bullets + internal action list |
+| `/what-next` | Idle moment or context-switch | Scans your pipeline and recommends exactly 3 things to do, ranked by impact |
+| `/quick-wins` | Anytime (~5 min) | Finds CRM hygiene issues you can fix immediately — stale dates, missing fields, orphaned tasks |
+
+### Recommended progression
+
+```
+First time:  /getting-started  →  pick an action from the menu
+Daily:       /daily            →  work through top 3  →  /quick-wins if time
+Weekly:      /weekly           →  drill into flagged items  →  /weekly-digest to save
+Ad hoc:      /what-next        →  follow the suggestions
+```
+
+> **Tip:** You can also skip the slash commands entirely and just describe what you need in plain English. The slash commands are shortcuts, not requirements.
 
 ---
 
@@ -158,6 +203,8 @@ Copilot CLI supports seamless handoff to VS Code. Start with `/plan` in the term
 ## Try It — Scenario Prompts
 
 Copy-paste any of these into the Copilot chat window after you've started the MCP servers. Each prompt is designed to trigger one or more [atomic skills](#role-cards--atomic-skills) automatically — you don't need to name the skills, just describe what you need.
+
+> **New here?** Start with `/getting-started` or `/my-role` instead of the prompts below. The slash commands guide you step-by-step. Come back to these scenario prompts once you're comfortable.
 
 ### Getting oriented
 
@@ -305,7 +352,9 @@ OIL exposes **22 domain-specific tools** including `get_customer_context`, `sear
 ---
 
 ## Project Layout
-![alt text](docs/assets/project-layout.png)
+
+![alt text](docs/assets/project-layout-flat.png)
+
 | Folder | What's inside | Editable? |
 |---|---|---|
 | `.github/copilot-instructions.md` | Global Copilot behavior — the "system prompt" | **Yes** — your main customization lever |
@@ -474,7 +523,7 @@ Staged operations expire automatically after 10 minutes if not acted on.
 
 ## How It Works (Under the Hood)
 
-![alt text](docs/assets/how-it-works.png)
+![alt text](docs/assets/how-it-works-flat.png)
 
 ```
 You (Copilot Chat)
